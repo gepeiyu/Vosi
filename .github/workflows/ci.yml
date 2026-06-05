@@ -1,0 +1,39 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/sherpa-onnx
+          key: sherpa-onnx-v1.13.2-osx-x64-${{ hashFiles('src-tauri/Cargo.lock') }}
+          restore-keys: sherpa-onnx-v1.13.2-osx-x64-
+
+      - name: Offline runtime guard
+        run: |
+          if grep -rE 'reqwest|ureq|hyper' src-tauri/Cargo.toml; then
+            echo "Direct HTTP client dependency found in Cargo.toml"
+            exit 1
+          fi
+
+      - name: Unit tests
+        run: cd src-tauri && cargo test --lib
+        env:
+          SHERPA_ONNX_ARCHIVE_DIR: ~/.cache/sherpa-onnx
+
+      - name: Clippy
+        run: cd src-tauri && cargo clippy --lib -- -D warnings
+        env:
+          SHERPA_ONNX_ARCHIVE_DIR: ~/.cache/sherpa-onnx

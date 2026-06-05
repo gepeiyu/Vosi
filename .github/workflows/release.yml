@@ -1,0 +1,86 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/sherpa-onnx
+          key: sherpa-onnx-v1.13.2-osx-x64-${{ hashFiles('src-tauri/Cargo.lock') }}
+          restore-keys: sherpa-onnx-v1.13.2-osx-x64-
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Download models
+        run: ./scripts/download-models.sh
+        continue-on-error: true
+
+      - name: Prepare bundled models
+        run: bash scripts/prepare-bundle-models.sh
+
+      - name: Build macOS app
+        run: npm run tauri build
+        env:
+          SHERPA_ONNX_ARCHIVE_DIR: ~/.cache/sherpa-onnx
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vosi-macos
+          path: |
+            src-tauri/target/release/bundle/dmg/*.dmg
+            src-tauri/target/release/bundle/macos/*.app
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/sherpa-onnx
+          key: sherpa-onnx-v1.13.2-win-x64-${{ hashFiles('src-tauri/Cargo.lock') }}
+          restore-keys: sherpa-onnx-v1.13.2-win-x64-
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Download models
+        run: bash scripts/download-models.sh
+        continue-on-error: true
+
+      - name: Prepare bundled models
+        run: bash scripts/prepare-bundle-models.sh
+
+      - name: Build Windows app
+        run: npm run tauri build
+        env:
+          SHERPA_ONNX_ARCHIVE_DIR: ~/.cache/sherpa-onnx
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vosi-windows
+          path: |
+            src-tauri/target/release/bundle/nsis/*.exe
