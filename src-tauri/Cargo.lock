@@ -3395,9 +3395,11 @@ dependencies = [
  "dirs 5.0.1",
  "serde",
  "serde_json",
+ "sha2",
  "tauri",
  "tauri-build",
  "tauri-plugin-opener",
+ "tempfile",
  "toml 0.8.2",
 ]
 
