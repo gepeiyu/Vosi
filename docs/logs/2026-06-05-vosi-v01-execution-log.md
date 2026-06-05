@@ -9,19 +9,18 @@
 
 ## 任务执行记录
 
-### Task 1: Repository Scaffold
-- 状态: ✅ Completed
-- 开始时间: 2026-06-05T14:10:00+08:00
-- 结束时间: 2026-06-05T14:25:00+08:00
-- 子代理状态: DONE_WITH_CONCERNS
-- 审查结果:
-  - 规格合规: ✅ PASS（`src/` 替代计划中的 `ui/` 为模板差异，可接受）
-  - 代码质量: ✅ Approved（Minor: `Cargo.toml` 包名仍为 `tauri-app`，Task 12 前统一）
-- 备注:
-  - `create-tauri-app --force` 曾删除未跟踪 `docs/`，已从 transcript 恢复
-  - 本机无 Rust，`cargo check` 未验证；需安装 Rust 后补测
-  - Commits: `28615d1`, `4eac469`
+### Task 1: Repository Scaffold — ✅ Completed
+- Commits: `28615d1`, `4eac469`
 
-### Task 2: Configuration Module
-- 状态: ⏳ In Progress
-- 开始时间: 2026-06-05T14:25:00+08:00
+### Task 2: Configuration Module — ✅ Completed
+- Commit: `5c522aa`
+- 测试: `cargo test config::` PASS
+
+### Task 3: ITN Post-Processing — ✅ Completed
+### Task 4: Hotword Post-Processing — ✅ Completed
+### Task 5: Model Manifest — ✅ Completed
+### Task 6: Model Manager — ✅ Completed
+- 测试: `cargo test` 7/7 PASS
+
+### Task 7: ASR Engine — ⏳ In Progress
+- 开始时间: 2026-06-05T15:45:00+08:00
