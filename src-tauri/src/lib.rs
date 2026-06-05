@@ -1,4 +1,6 @@
+pub mod asr;
 pub mod config;
+pub mod post;
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
