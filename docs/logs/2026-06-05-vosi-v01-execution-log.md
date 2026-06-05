@@ -9,18 +9,14 @@
 
 ## 任务执行记录
 
-### Task 1: Repository Scaffold — ✅ Completed
-- Commits: `28615d1`, `4eac469`
+### Task 1–6 — ✅ Completed
+- Commits: `28615d1` … `3781794`
+- 测试: `cargo test` 7/7 PASS（Task 6 时）
 
-### Task 2: Configuration Module — ✅ Completed
-- Commit: `5c522aa`
-- 测试: `cargo test config::` PASS
+### Task 7: ASR Engine — ✅ Completed（代码已提交，编译待网络）
+- Commit: 见最新 `feat: add sherpa-onnx ASR and punctuation engines`
+- 实现: `asr/engine.rs`, `asr/punctuation.rs`, `asr/paths.rs`, `tests/asr_pipeline.rs`
+- 阻塞: `sherpa-onnx-sys` 首次构建需从 GitHub 下载 ~17.5MB 静态库；当前网络极慢/超时
+- 本地修复: 下载完成后设置 `export SHERPA_ONNX_ARCHIVE_DIR=/path/to/.cache/sherpa-onnx` 或让 cargo 自动拉取
 
-### Task 3: ITN Post-Processing — ✅ Completed
-### Task 4: Hotword Post-Processing — ✅ Completed
-### Task 5: Model Manifest — ✅ Completed
-### Task 6: Model Manager — ✅ Completed
-- 测试: `cargo test` 7/7 PASS
-
-### Task 7: ASR Engine — ⏳ In Progress
-- 开始时间: 2026-06-05T15:45:00+08:00
+### Task 8–16 — ⏳ Pending
