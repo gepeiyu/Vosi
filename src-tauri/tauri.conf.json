@@ -19,6 +19,20 @@
         "height": 640,
         "visible": false,
         "decorations": true
+      },
+      {
+        "label": "overlay",
+        "title": "Vosi Overlay",
+        "url": "overlay.html",
+        "width": 280,
+        "height": 56,
+        "visible": false,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "resizable": false,
+        "focus": false
       }
     ],
     "security": {

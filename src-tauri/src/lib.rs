@@ -7,6 +7,7 @@ pub mod hotkey;
 pub mod inject;
 pub mod log;
 pub mod notify;
+pub mod overlay;
 pub mod pipeline;
 pub mod post;
 
@@ -129,6 +130,10 @@ pub fn run() {
         .manage(app_state)
         .setup(move |app| {
             setup_tray_menu(app)?;
+            let _overlay = overlay::OverlayController::new(
+                app.handle().clone(),
+                config.overlay.enabled,
+            );
             let bundled = app
                 .path()
                 .resource_dir()
