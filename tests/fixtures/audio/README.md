@@ -4,7 +4,7 @@ Place 16 kHz mono PCM WAV files here for integration tests. Each file should be 
 
 | File | Spoken content | Expected transcription contains |
 |------|----------------|--------------------------------|
-| `short_greeting.wav` | 你好 | 你好 |
+| `short_greeting.wav` | sherpa `test_wavs/0.wav`（占位） | 研究 / 介绍 |
 | `number_amount.wav` | 一共一百二十三块五 | 123 |
 | `date_sentence.wav` | 今天是二零二六年六月五日 | 2026 |
 | `mixed_en_cn.wav` | 打开 Chrome 浏览器 | Chrome |

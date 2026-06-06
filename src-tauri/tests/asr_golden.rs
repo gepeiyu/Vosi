@@ -40,8 +40,12 @@ fn transcribe_fixture(name: &str) -> String {
 #[test]
 #[ignore = "requires models and recorded fixtures"]
 fn golden_short_greeting() {
+    // short_greeting.wav: sherpa-onnx paraformer test_wavs/0.wav (placeholder until local recording)
     let text = transcribe_fixture("short_greeting.wav");
-    assert!(text.contains("你好"), "got: {text}");
+    assert!(
+        text.contains("研究") || text.contains("介绍"),
+        "got: {text}"
+    );
 }
 
 #[test]
