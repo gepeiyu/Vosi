@@ -53,11 +53,43 @@ body {
   gap: 16px;
 }
 
+.settings-section {
+  margin-top: 8px;
+}
+
+.settings-section h2 {
+  font-size: 0.95rem;
+  margin: 0 0 8px;
+  color: #666;
+}
+
+.settings-section > label + label,
+.settings-section > label + .field-note {
+  margin-top: 16px;
+}
+
+.field-note {
+  margin: -8px 0 0;
+  font-size: 0.8rem;
+  color: #888;
+}
+
 label {
   display: flex;
   flex-direction: column;
   gap: 6px;
   font-weight: 500;
+}
+
+label.checkbox {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+label.checkbox input[type="checkbox"] {
+  width: auto;
+  margin: 0;
 }
 
 input,
@@ -100,7 +132,9 @@ button:hover {
   }
 
   .subtitle,
-  .save-status {
+  .save-status,
+  .settings-section h2,
+  .field-note {
     color: #a1a1a6;
   }
 

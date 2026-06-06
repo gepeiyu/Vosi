@@ -11,6 +11,7 @@ type AppConfig = {
   hotword: { enabled: boolean; file: string };
   inject: { method: string };
   general: { start_on_boot: boolean; show_tray: boolean };
+  overlay: { enabled: boolean };
 };
 
 function byId<T extends HTMLElement>(id: string): T {
@@ -36,8 +37,14 @@ function fillForm(cfg: AppConfig) {
   byId<HTMLInputElement>("silence-threshold").value = String(
     cfg.audio.silence_threshold_ms,
   );
+  byId<HTMLInputElement>("min-speech-ms").value = String(cfg.audio.min_speech_ms);
+  byId<HTMLSelectElement>("num-threads").value = String(cfg.asr.num_threads);
+  byId<HTMLInputElement>("hotword-enabled").checked = cfg.hotword.enabled;
   byId<HTMLSelectElement>("inject-method").value = cfg.inject.method;
   byId<HTMLInputElement>("hotword-file").value = cfg.hotword.file;
+  byId<HTMLInputElement>("overlay-enabled").checked = cfg.overlay.enabled;
+  byId<HTMLInputElement>("show-tray").checked = cfg.general.show_tray;
+  byId<HTMLInputElement>("start-on-boot").checked = cfg.general.start_on_boot;
 }
 
 function readForm(base: AppConfig): AppConfig {
@@ -52,17 +59,28 @@ function readForm(base: AppConfig): AppConfig {
       silence_threshold_ms: Number(
         byId<HTMLInputElement>("silence-threshold").value,
       ),
+      min_speech_ms: Number(byId<HTMLInputElement>("min-speech-ms").value),
     },
     asr: {
       ...base.asr,
       mode: byId<HTMLSelectElement>("asr-mode").value,
+      num_threads: Number(byId<HTMLSelectElement>("num-threads").value),
     },
     inject: {
       method: byId<HTMLSelectElement>("inject-method").value,
     },
     hotword: {
       ...base.hotword,
+      enabled: byId<HTMLInputElement>("hotword-enabled").checked,
       file: byId<HTMLInputElement>("hotword-file").value,
+    },
+    general: {
+      ...base.general,
+      show_tray: byId<HTMLInputElement>("show-tray").checked,
+      start_on_boot: byId<HTMLInputElement>("start-on-boot").checked,
+    },
+    overlay: {
+      enabled: byId<HTMLInputElement>("overlay-enabled").checked,
     },
   };
 }
