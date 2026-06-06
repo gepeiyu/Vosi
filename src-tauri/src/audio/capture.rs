@@ -1,5 +1,8 @@
+use crate::audio::level::rms_level;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{Sample, SampleFormat, StreamConfig};
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
 
 pub struct AudioCapture {
@@ -9,7 +12,14 @@ pub struct AudioCapture {
 }
 
 impl AudioCapture {
-    pub fn start(_target_sample_rate: u32) -> Result<Self, String> {
+    pub fn start(target_sample_rate: u32) -> Result<Self, String> {
+        Self::start_with_level(target_sample_rate, None)
+    }
+
+    pub fn start_with_level(
+        _target_sample_rate: u32,
+        level_tx: Option<Sender<f32>>,
+    ) -> Result<Self, String> {
         let host = cpal::default_host();
         let device = host
             .default_input_device()
@@ -23,29 +33,66 @@ impl AudioCapture {
 
         let samples = Arc::new(Mutex::new(Vec::<f32>::new()));
         let buf = samples.clone();
+        let since_last_level = Arc::new(AtomicUsize::new(0));
+
         let stream = match sample_format {
-            SampleFormat::F32 => device.build_input_stream(
-                &config,
-                move |data: &[f32], _| append_samples(&buf, data.iter().copied()),
-                stream_error,
-                None,
-            ),
-            SampleFormat::I16 => device.build_input_stream(
-                &config,
-                move |data: &[i16], _| {
-                    append_samples(&buf, data.iter().map(|s| s.to_sample::<f32>()))
-                },
-                stream_error,
-                None,
-            ),
-            SampleFormat::U16 => device.build_input_stream(
-                &config,
-                move |data: &[u16], _| {
-                    append_samples(&buf, data.iter().map(|s| s.to_sample::<f32>()))
-                },
-                stream_error,
-                None,
-            ),
+            SampleFormat::F32 => {
+                let level_tx = level_tx.clone();
+                let level_counter = since_last_level.clone();
+                device.build_input_stream(
+                    &config,
+                    move |data: &[f32], _| {
+                        append_samples(&buf, data.iter().copied());
+                        maybe_emit_level(
+                            &buf,
+                            data.len(),
+                            sample_rate,
+                            &level_tx,
+                            &level_counter,
+                        );
+                    },
+                    stream_error,
+                    None,
+                )
+            }
+            SampleFormat::I16 => {
+                let level_tx = level_tx.clone();
+                let level_counter = since_last_level.clone();
+                device.build_input_stream(
+                    &config,
+                    move |data: &[i16], _| {
+                        append_samples(&buf, data.iter().map(|s| s.to_sample::<f32>()));
+                        maybe_emit_level(
+                            &buf,
+                            data.len(),
+                            sample_rate,
+                            &level_tx,
+                            &level_counter,
+                        );
+                    },
+                    stream_error,
+                    None,
+                )
+            }
+            SampleFormat::U16 => {
+                let level_tx = level_tx.clone();
+                let level_counter = since_last_level.clone();
+                device.build_input_stream(
+                    &config,
+                    move |data: &[u16], _| {
+                        append_samples(&buf, data.iter().map(|s| s.to_sample::<f32>()));
+                        maybe_emit_level(
+                            &buf,
+                            data.len(),
+                            sample_rate,
+                            &level_tx,
+                            &level_counter,
+                        );
+                    },
+                    stream_error,
+                    None,
+                )
+            }
             other => return Err(format!("unsupported sample format: {other:?}")),
         }
         .map_err(|e| e.to_string())?;
@@ -69,6 +116,30 @@ impl AudioCapture {
     }
 }
 
+fn should_emit_level(prev_count: usize, batch_len: usize, sample_rate: u32) -> bool {
+    prev_count + batch_len >= sample_rate as usize / 20
+}
+
+fn maybe_emit_level(
+    buf: &Arc<Mutex<Vec<f32>>>,
+    batch_len: usize,
+    sample_rate: u32,
+    level_tx: &Option<Sender<f32>>,
+    since_last_level: &AtomicUsize,
+) {
+    let Some(tx) = level_tx else {
+        return;
+    };
+    let prev = since_last_level.fetch_add(batch_len, Ordering::Relaxed);
+    if should_emit_level(prev, batch_len, sample_rate) {
+        let guard = buf.lock().expect("audio buffer lock");
+        let window = sample_rate as usize / 10;
+        let tail = &guard[guard.len().saturating_sub(window)..];
+        let _ = tx.send(rms_level(tail));
+        since_last_level.store(0, Ordering::Relaxed);
+    }
+}
+
 fn append_samples<I>(buf: &Arc<Mutex<Vec<f32>>>, iter: I)
 where
     I: Iterator<Item = f32>,
@@ -82,8 +153,18 @@ fn stream_error(err: cpal::StreamError) {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+
     #[test]
-    fn module_links() {
-        assert!(true);
+    fn should_emit_level_after_fifty_ms_of_samples() {
+        assert!(!should_emit_level(0, 799, 16_000));
+        assert!(should_emit_level(0, 800, 16_000));
+        assert!(should_emit_level(700, 100, 16_000));
+    }
+
+    #[test]
+    #[ignore = "requires microphone hardware"]
+    fn start_accepts_optional_level_sender() {
+        let _ = AudioCapture::start_with_level(16_000, None);
     }
 }
