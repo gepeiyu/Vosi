@@ -15,6 +15,7 @@ use config::AppConfig;
 use hotkey::listener::{self, HotkeyEvent};
 use inject::{default_injector, method_from_config};
 use log::Logger;
+use asr::ModelManager;
 use pipeline::session::VoiceSession;
 use std::path::PathBuf;
 use std::sync::{mpsc, Arc};
@@ -28,10 +29,22 @@ fn models_data_dir() -> PathBuf {
         .join("vosi")
 }
 
+fn dev_models_dir() -> Option<PathBuf> {
+    #[cfg(debug_assertions)]
+    {
+        let dev = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../models/dev");
+        if ModelManager::paraformer_ready(&dev) {
+            return Some(dev);
+        }
+    }
+    None
+}
+
 fn spawn_voice_pipeline(
     app: tauri::AppHandle,
     config: AppConfig,
     bundled: PathBuf,
+    dev_models: Option<PathBuf>,
     logger: Arc<Logger>,
 ) {
     let (hotkey_tx, hotkey_rx) = mpsc::channel::<HotkeyEvent>();
@@ -45,6 +58,7 @@ fn spawn_voice_pipeline(
             config,
             models_data_dir(),
             &bundled,
+            dev_models.as_deref(),
             logger.clone(),
         ) {
             Ok(session) => session,
@@ -118,7 +132,13 @@ pub fn run() {
                 .resource_dir()
                 .map(|dir| dir.join("models/bundled"))
                 .unwrap_or_else(|_| PathBuf::from("models/bundled"));
-            spawn_voice_pipeline(app.handle().clone(), config, bundled, logger);
+            spawn_voice_pipeline(
+                app.handle().clone(),
+                config,
+                bundled,
+                dev_models_dir(),
+                logger,
+            );
             Ok(())
         })
         .on_menu_event(|app, event| match event.id.as_ref() {

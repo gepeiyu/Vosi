@@ -39,11 +39,23 @@ impl ModelManager {
         format!("{:x}", digest) == expected.to_lowercase()
     }
 
-    pub fn ensure_installed(&self, bundled: &Path) -> std::io::Result<ModelPaths> {
+    pub fn paraformer_ready(base: &Path) -> bool {
+        let dir = base.join("paraformer-zh");
+        ["model.int8.onnx", "model.onnx", "model_quant.onnx"]
+            .iter()
+            .any(|name| dir.join(name).exists())
+    }
+
+    pub fn ensure_installed(&self, bundled: &Path, dev_fallback: Option<&Path>) -> std::io::Result<ModelPaths> {
         let dest = self.models_dir();
-        if !dest.exists() {
+        if !Self::paraformer_ready(&dest) {
             std::fs::create_dir_all(&dest)?;
             copy_dir_all(bundled, &dest)?;
+            if !Self::paraformer_ready(&dest) {
+                if let Some(dev) = dev_fallback {
+                    copy_dir_all(dev, &dest)?;
+                }
+            }
         }
         Ok(self.resolve_paths())
     }

@@ -35,13 +35,30 @@
 
 ```bash
 export SHERPA_ONNX_ARCHIVE_DIR=/Users/silverwing/develop/Vosi/.cache/sherpa-onnx
-export CARGO_TARGET_DIR=/Users/silverwing/develop/Vosi/.cache/cargo-target
+export VOSI_PROXY=http://127.0.0.1:7890   # 可选，加速 HuggingFace/GitHub
+./scripts/download-models.sh
+
 cd src-tauri && cargo test --lib
-# 2026-06-05: 11/11 PASS
+# 2026-06-06: 11/11 PASS
+
+cargo test --test asr_pipeline -- --ignored
+cargo test --test asr_golden -- golden_short_greeting --ignored
+# 2026-06-06: PASS（sherpa test_wavs/0.wav 作占位 fixture）
+
+npm run tauri dev
+# 2026-06-06: voice session initialized（debug 自动从 models/dev 安装）
 ```
+
+## 收尾记录（2026-06-06）
+
+- **模型镜像**：魔搭 FunASR ONNX 与 sherpa-onnx 不兼容；ASR/标点须 csukuangfj 预打包格式
+- **下载脚本**：`VOSI_PROXY` + `hf-mirror` / HuggingFace 双通道
+- **开发体验**：debug 构建自动将 `models/dev/` 复制到 `~/Library/Application Support/vosi/models/`
+- **待用户手动**：按住说话 E2E、macOS 麦克风/辅助功能权限、Golden WAV 本地录制替换占位文件
 
 ## v0.1 全部 Task 完成
 
 ```
 Task 1–16 ✅
+收尾验证 ✅（ASR 集成测试 + tauri dev 启动）
 ```

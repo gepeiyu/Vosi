@@ -13,7 +13,9 @@ git clone https://github.com/gepeiyu/Vosi.git
 cd Vosi
 npm install
 
-# 下载 ASR 模型（约 200 MB，仅开发时需要）
+# 下载 ASR 模型（约 360 MB，仅开发时需要）
+# 有本地代理时推荐：
+export VOSI_PROXY=http://127.0.0.1:7890
 ./scripts/download-models.sh
 
 # 首次编译需下载 sherpa-onnx 静态库（~18 MB）
@@ -21,6 +23,7 @@ export SHERPA_ONNX_ARCHIVE_DIR="$PWD/.cache/sherpa-onnx"
 
 cd src-tauri && cargo test --lib && cd ..
 npm run tauri dev
+# debug 构建会自动从 models/dev/ 安装模型到 Application Support
 ```
 
 ## 首次使用（终端用户）

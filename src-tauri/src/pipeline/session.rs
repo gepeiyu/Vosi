@@ -29,10 +29,13 @@ impl VoiceSession {
         config: AppConfig,
         models_root: PathBuf,
         bundled: &Path,
+        dev_models: Option<&Path>,
         logger: Arc<Logger>,
     ) -> Result<Self, String> {
         let mgr = ModelManager::new(models_root);
-        let paths = mgr.ensure_installed(bundled).map_err(|e| e.to_string())?;
+        let paths = mgr
+            .ensure_installed(bundled, dev_models)
+            .map_err(|e| e.to_string())?;
         let asr = AsrEngine::new(&paths.paraformer_dir, config.asr.num_threads as i32)?;
         let punc = PunctuationEngine::new(&paths.punc_dir, config.asr.num_threads as i32)?;
         let hotword_path = expand_tilde(&config.hotword.file);
