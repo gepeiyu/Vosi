@@ -1,4 +1,5 @@
-use tauri::{AppHandle, Manager, Runtime};
+use tauri::image::Image;
+use tauri::{include_image, AppHandle, Manager, Runtime};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TrayStatus {
@@ -15,9 +16,18 @@ pub fn tooltip_for(status: TrayStatus) -> &'static str {
     }
 }
 
+fn icon_for(status: TrayStatus) -> Image<'static> {
+    match status {
+        TrayStatus::Idle => include_image!("icons/icon-idle.png"),
+        TrayStatus::Recording => include_image!("icons/icon-recording.png"),
+        TrayStatus::Warning => include_image!("icons/icon-warning.png"),
+    }
+}
+
 pub fn set_status<R: Runtime>(app: &AppHandle<R>, status: TrayStatus) {
     if let Some(tray) = app.tray_by_id("main") {
         let _ = tray.set_tooltip(Some(tooltip_for(status)));
+        let _ = tray.set_icon(Some(icon_for(status)));
     }
 }
 
