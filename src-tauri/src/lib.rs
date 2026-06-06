@@ -62,8 +62,7 @@ fn spawn_voice_pipeline(
     notifier: Notifier,
 ) {
     let (hotkey_tx, hotkey_rx) = mpsc::channel::<HotkeyEvent>();
-    let trigger = listener::key_from_name(&config.hotkey.trigger_key);
-    listener::spawn_hotkey_listener(trigger, hotkey_tx);
+    listener::spawn_hotkey_listener(&config.hotkey.trigger_key, hotkey_tx);
 
     let inject_method = method_from_config(&config.inject.method);
     thread::spawn(move || {
