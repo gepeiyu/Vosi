@@ -6,6 +6,7 @@ pub mod config;
 pub mod hotkey;
 pub mod inject;
 pub mod log;
+pub mod notify;
 pub mod pipeline;
 pub mod post;
 
@@ -124,6 +125,7 @@ pub fn run() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_notification::init())
         .manage(app_state)
         .setup(move |app| {
             setup_tray_menu(app)?;
