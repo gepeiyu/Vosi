@@ -81,6 +81,13 @@ mod tests {
     }
 
     #[test]
+    fn inject_with_fallback_returns_not_injected_on_failure() {
+        let result = inject_with_fallback(&FailingInjector, "你好世界", InjectMethod::Type);
+        assert!(!result.injected);
+    }
+
+    #[test]
+    #[ignore = "requires system clipboard access"]
     fn inject_with_fallback_copies_to_clipboard_on_failure() {
         let text = "你好世界";
         let result = inject_with_fallback(&FailingInjector, text, InjectMethod::Type);
