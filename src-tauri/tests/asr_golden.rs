@@ -31,7 +31,7 @@ fn transcribe_fixture(name: &str) -> String {
     let punct = PunctuationEngine::new(&punc_dir, 1).expect("punctuation engine");
     let hotwords = HotwordReplacer::from_lines(vec![]);
 
-    let wave = sherpa_onnx::Wave::read(&wav).expect("read wav");
+    let wave = sherpa_onnx::Wave::read(wav.to_str().expect("wav path utf-8")).expect("read wav");
     let raw = engine.transcribe(wave.samples(), wave.sample_rate() as u32);
     let punctuated = punct.punctuate(&raw);
     post_process(&punctuated, &hotwords, false)

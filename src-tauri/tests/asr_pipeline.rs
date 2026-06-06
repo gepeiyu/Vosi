@@ -16,7 +16,7 @@ fn asr_pipeline_produces_text_from_fixture() {
     let paraformer_dir = root.join("paraformer-zh");
     let punc_dir = root.join("punctuation");
     let wav = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("tests/fixtures/audio/short_greeting.wav");
+        .join("../tests/fixtures/audio/short_greeting.wav");
 
     if !paraformer_dir.exists() {
         eprintln!("skip: models not downloaded");
@@ -31,7 +31,7 @@ fn asr_pipeline_produces_text_from_fixture() {
         return;
     }
 
-    let wave = sherpa_onnx::Wave::read(&wav).expect("read wav");
+    let wave = sherpa_onnx::Wave::read(wav.to_str().expect("wav path utf-8")).expect("read wav");
     let raw = engine.transcribe(wave.samples(), wave.sample_rate() as u32);
     assert!(!raw.trim().is_empty(), "expected non-empty transcription");
     let final_text = punct.punctuate(&raw);

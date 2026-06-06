@@ -21,9 +21,26 @@ Vosi v0.1 使用 FunASR 生态导出的 ONNX 模型，通过 [sherpa-onnx](https
 
 ## 下载
 
+**重要**：ASR 与标点须使用 **sherpa-onnx 预打包** 的 ONNX（含 `vocab_size` / `tokens` metadata）。魔搭上的 FunASR 原生 ONNX（`model_quant.onnx`）与 sherpa-onnx **不兼容**。
+
 ```bash
+# 推荐：本地 VPN 代理 + HuggingFace / GitHub（最快、格式正确）
+export VOSI_PROXY=http://127.0.0.1:7890
 ./scripts/download-models.sh
+
+# 无代理：HuggingFace 国内镜像
+VOSI_MODEL_MIRROR=hf-mirror ./scripts/download-models.sh
+
+# 强制走 GitHub Releases（需代理）
+export VOSI_PROXY=http://127.0.0.1:7890
+VOSI_MODEL_MIRROR=github ./scripts/download-models.sh
 ```
+
+| 组件 | 来源 | 说明 |
+|------|------|------|
+| ASR | [csukuangfj/sherpa-onnx-paraformer-zh-small](https://huggingface.co/csukuangfj/sherpa-onnx-paraformer-zh-small-2024-03-09) | sherpa INT8，~78MB |
+| 标点 | [csukuangfj/sherpa-onnx-punct-ct-transformer](https://huggingface.co/csukuangfj/sherpa-onnx-punct-ct-transformer-zh-en-vocab272727-2024-04-12) | sherpa 格式，~280MB |
+| VAD | GitHub `silero_vad.onnx` | ~2MB；魔搭 FSMN 为备选 |
 
 模型安装到 `models/dev/`，发布构建前执行：
 

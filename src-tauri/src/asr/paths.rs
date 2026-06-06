@@ -76,7 +76,12 @@ pub fn resolve_punctuation_model(dir: &Path) -> Result<PathBuf, String> {
     for root in search_roots {
         if let Some(model) = first_existing(
             &root,
-            &["model.onnx", "model.int8.onnx", "punc_ct-transformer.onnx"],
+            &[
+                "model.onnx",
+                "model.int8.onnx",
+                "model_quant.onnx",
+                "punc_ct-transformer.onnx",
+            ],
         ) {
             return Ok(model);
         }
