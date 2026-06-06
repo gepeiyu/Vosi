@@ -2,13 +2,17 @@ use crate::asr::engine::AsrEngine;
 use crate::asr::punctuation::PunctuationEngine;
 use crate::asr::ModelManager;
 use crate::audio::capture::AudioCapture;
+use crate::audio::vad::VadEngine;
 use crate::config::AppConfig;
 use crate::log::Logger;
 use crate::post::hotword::HotwordReplacer;
 use crate::post::pipeline::post_process;
 use std::path::{Path, PathBuf};
+use std::sync::mpsc;
 use std::sync::Arc;
-use std::time::Instant;
+use std::time::{Duration, Instant};
+
+const INFERENCE_TIMEOUT: Duration = Duration::from_secs(5);
 
 pub enum SessionState {
     Idle,
@@ -21,6 +25,7 @@ pub struct VoiceSession {
     hotwords: HotwordReplacer,
     config: AppConfig,
     logger: Arc<Logger>,
+    vad: Option<VadEngine>,
     state: SessionState,
 }
 
@@ -42,6 +47,16 @@ impl VoiceSession {
         let hotwords = HotwordReplacer::from_file(&hotword_path)
             .unwrap_or_else(|_| HotwordReplacer::from_lines(vec![]));
 
+        let vad = if config.asr.mode == "long" && paths.vad_model.exists() {
+            Some(VadEngine::new(
+                &paths.vad_model,
+                16000,
+                config.audio.silence_threshold_ms,
+            )?)
+        } else {
+            None
+        };
+
         logger.info("voice session initialized");
 
         Ok(Self {
@@ -50,13 +65,22 @@ impl VoiceSession {
             hotwords,
             config,
             logger,
+            vad,
             state: SessionState::Idle,
         })
     }
 
     pub fn on_hotkey_press(&mut self) -> Result<(), String> {
+        self.on_hotkey_press_with_level(None)
+    }
+
+    pub fn on_hotkey_press_with_level(
+        &mut self,
+        level_tx: Option<mpsc::Sender<f32>>,
+    ) -> Result<(), String> {
         if matches!(self.state, SessionState::Idle) {
-            let capture = AudioCapture::start(self.config.audio.sample_rate)?;
+            let capture =
+                AudioCapture::start_with_level(self.config.audio.sample_rate, level_tx)?;
             self.logger.info("recording started");
             self.state = SessionState::Recording(capture);
         }
@@ -84,6 +108,7 @@ impl VoiceSession {
             &self.punc,
             &self.hotwords,
             &self.config,
+            self.vad.as_ref(),
             samples,
             sample_rate,
         );
@@ -97,25 +122,72 @@ impl VoiceSession {
     }
 }
 
+pub fn join_segments(parts: &[String]) -> String {
+    parts.join("\n")
+}
+
 fn finalize_recording(
     asr: &AsrEngine,
     punc: &PunctuationEngine,
     hotwords: &HotwordReplacer,
     config: &AppConfig,
+    vad_engine: Option<&VadEngine>,
     samples: Vec<f32>,
     sample_rate: u32,
 ) -> Result<Option<String>, String> {
-    let raw = asr.transcribe(&samples, sample_rate);
-    if raw.trim().is_empty() {
+    let segments: Vec<Vec<f32>> = if config.asr.mode == "long" {
+        if let Some(vad) = vad_engine {
+            vad.segment(&samples, config.audio.min_speech_ms)
+        } else {
+            vec![samples]
+        }
+    } else {
+        vec![samples]
+    };
+
+    if segments.is_empty() {
         return Ok(None);
     }
-    let punctuated = punc.punctuate(&raw);
-    let final_text = post_process(
-        &punctuated,
-        hotwords,
-        config.hotword.enabled,
-    );
-    Ok(Some(final_text))
+
+    let hotword_enabled = config.hotword.enabled;
+    let (tx, rx) = mpsc::channel();
+
+    // Scoped thread borrows engines (&T requires T: Sync). If this fails to compile,
+    // inference runs synchronously on the pipeline thread and timeout is best-effort.
+    let texts: Vec<String> = std::thread::scope(|s| -> Result<Vec<String>, String> {
+        s.spawn(|| {
+            let texts: Vec<String> = segments
+                .iter()
+                .filter_map(|seg| {
+                    let raw = asr.transcribe(seg, sample_rate);
+                    if raw.trim().is_empty() {
+                        return None;
+                    }
+                    let punctuated = punc.punctuate(&raw);
+                    Some(post_process(
+                        &punctuated,
+                        hotwords,
+                        hotword_enabled,
+                    ))
+                })
+                .collect();
+            let _ = tx.send(texts);
+        });
+
+        match rx.recv_timeout(INFERENCE_TIMEOUT) {
+            Ok(texts) => Ok(texts),
+            Err(mpsc::RecvTimeoutError::Timeout) => Err("inference timeout".into()),
+            Err(mpsc::RecvTimeoutError::Disconnected) => {
+                Err("inference thread disconnected".into())
+            }
+        }
+    })?;
+
+    if texts.is_empty() {
+        Ok(None)
+    } else {
+        Ok(Some(join_segments(&texts)))
+    }
 }
 
 pub fn meets_min_duration(sample_count: usize, sample_rate: u32, min_speech_ms: u32) -> bool {
@@ -139,6 +211,12 @@ fn expand_tilde(path: &str) -> PathBuf {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn join_segments_inserts_newlines() {
+        let parts = vec!["第一句".into(), "第二句".into()];
+        assert_eq!(join_segments(&parts), "第一句\n第二句");
+    }
 
     #[test]
     fn short_audio_below_min_duration_is_rejected() {
