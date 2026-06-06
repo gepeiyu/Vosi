@@ -8,8 +8,6 @@ on:
 jobs:
   test:
     runs-on: macos-latest
-    env:
-      SHERPA_ONNX_ARCHIVE_DIR: ${{ env.HOME }}/.cache/sherpa-onnx
     steps:
       - uses: actions/checkout@v4
 
@@ -25,7 +23,9 @@ jobs:
 
       - name: Download sherpa-onnx prebuilt libs
         run: |
-          mkdir -p "$HOME/.cache/sherpa-onnx"
+          ARCHIVE_DIR="$HOME/.cache/sherpa-onnx"
+          echo "SHERPA_ONNX_ARCHIVE_DIR=$ARCHIVE_DIR" >> "$GITHUB_ENV"
+          mkdir -p "$ARCHIVE_DIR"
           case "${{ runner.arch }}" in
             ARM64) ARCH=arm64 ;;
             X64) ARCH=x64 ;;
@@ -35,7 +35,7 @@ jobs:
               ;;
           esac
           ARCHIVE="sherpa-onnx-v1.13.2-osx-${ARCH}-static-lib.tar.bz2"
-          DEST="$HOME/.cache/sherpa-onnx/$ARCHIVE"
+          DEST="$ARCHIVE_DIR/$ARCHIVE"
           if [ ! -f "$DEST" ]; then
             curl -fsSL --retry 5 -o "$DEST" \
               "https://github.com/k2-fsa/sherpa-onnx/releases/download/v1.13.2/$ARCHIVE"
