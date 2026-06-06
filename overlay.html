@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="stylesheet" href="/src/overlay.css" />
+    <script type="module" src="/src/overlay.ts" defer></script>
+  </head>
+  <body>
+    <div id="capsule" class="capsule hidden" aria-live="polite">
+      <div class="capsule-inner">
+        <div id="recording-view" class="view view-recording hidden">
+          <div class="recording-leading">
+            <span class="recording-dot"></span>
+            <span class="brand">Vosi</span>
+          </div>
+          <div class="bars" id="bars"></div>
+        </div>
+        <div id="processing-view" class="view view-processing hidden">
+          <span class="ring"></span>
+          <span class="status-text">
+            识别中
+            <span class="dots" aria-hidden="true"><span></span><span></span><span></span></span>
+          </span>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

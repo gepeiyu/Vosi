@@ -21,43 +21,95 @@
       </div>
 
       <form id="settings-form" class="settings-form">
-        <label>
-          触发键
-          <select id="trigger-key" name="trigger_key">
-            <option value="RightCommand">右 Command ⌘（macOS 推荐）</option>
-            <option value="LeftCommand">左 Command ⌘</option>
-            <option value="RightAlt">右 Alt（Windows 推荐）</option>
-            <option value="LeftAlt">左 Alt</option>
-            <option value="RightCtrl">右 Ctrl</option>
-            <option value="LeftCtrl">左 Ctrl</option>
-          </select>
-        </label>
+        <section class="settings-section">
+          <h2>语音</h2>
 
-        <label>
-          ASR 模式
-          <select id="asr-mode" name="asr_mode">
-            <option value="short">短句</option>
-            <option value="long">长句</option>
-          </select>
-        </label>
+          <label>
+            静音阈值 (ms)
+            <input id="silence-threshold" name="silence_threshold_ms" type="number" min="200" max="3000" step="100" />
+          </label>
 
-        <label>
-          静音阈值 (ms)
-          <input id="silence-threshold" name="silence_threshold_ms" type="number" min="200" max="3000" step="100" />
-        </label>
+          <label>
+            最短语音 (ms)
+            <input id="min-speech-ms" name="min_speech_ms" type="number" min="100" max="1000" step="50" />
+          </label>
+        </section>
 
-        <label>
-          注入方式
-          <select id="inject-method" name="inject_method">
-            <option value="type">模拟键盘输入</option>
-            <option value="paste">剪贴板粘贴</option>
-          </select>
-        </label>
+        <section class="settings-section">
+          <h2>识别</h2>
 
-        <label>
-          热词文件路径
-          <input id="hotword-file" name="hotword_file" type="text" />
-        </label>
+          <label>
+            ASR 模式
+            <select id="asr-mode" name="asr_mode">
+              <option value="short">短句</option>
+              <option value="long">长句</option>
+            </select>
+          </label>
+
+          <label>
+            推理线程数
+            <select id="num-threads" name="num_threads">
+              <option value="1">1</option>
+              <option value="2">2</option>
+              <option value="3">3</option>
+              <option value="4">4</option>
+            </select>
+          </label>
+
+          <label class="checkbox">
+            <input id="hotword-enabled" name="hotword_enabled" type="checkbox" />
+            启用热词替换
+          </label>
+
+          <label>
+            热词文件路径
+            <input id="hotword-file" name="hotword_file" type="text" />
+          </label>
+        </section>
+
+        <section class="settings-section">
+          <h2>输出</h2>
+
+          <label>
+            注入方式
+            <select id="inject-method" name="inject_method">
+              <option value="type">模拟键盘输入</option>
+              <option value="paste">剪贴板粘贴</option>
+            </select>
+          </label>
+        </section>
+
+        <section class="settings-section">
+          <h2>通用</h2>
+
+          <label>
+            触发键
+            <select id="trigger-key" name="trigger_key">
+              <option value="RightCommand">右 Command ⌘（macOS 推荐）</option>
+              <option value="LeftCommand">左 Command ⌘</option>
+              <option value="RightAlt">右 Alt（Windows 推荐）</option>
+              <option value="LeftAlt">左 Alt</option>
+              <option value="RightCtrl">右 Ctrl</option>
+              <option value="LeftCtrl">左 Ctrl</option>
+            </select>
+          </label>
+
+          <label class="checkbox">
+            <input id="overlay-enabled" name="overlay_enabled" type="checkbox" />
+            显示浮动胶囊
+          </label>
+
+          <label class="checkbox">
+            <input id="show-tray" name="show_tray" type="checkbox" />
+            显示托盘图标
+          </label>
+
+          <label class="checkbox">
+            <input id="start-on-boot" name="start_on_boot" type="checkbox" />
+            开机自启动
+          </label>
+          <p class="field-note">平台注册即将支持</p>
+        </section>
 
         <div class="form-actions">
           <button type="submit" id="save-btn">保存设置</button>

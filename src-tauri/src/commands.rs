@@ -24,7 +24,8 @@ pub fn get_accessibility_hint() -> Option<String> {
             hint.push_str(&exe.display().to_string());
         }
         hint.push_str(
-            "\n\n也可先按住触发键说话，系统弹出麦克风授权时再点允许。\
+            "\n\n热键监听还需要「辅助功能」权限（CGEventTap）。\
+             也可先按住触发键说话，系统弹出麦克风授权时再点允许。\
              辅助功能需点「+」手动添加上述路径。",
         );
         Some(hint)

@@ -10,12 +10,13 @@ impl PunctuationEngine {
     pub fn new(punc_dir: &Path, num_threads: i32) -> Result<Self, String> {
         let model = resolve_punctuation_model(punc_dir)?;
 
-        let mut config = OfflinePunctuationConfig::default();
-        config.model = OfflinePunctuationModelConfig {
-            ct_transformer: Some(model.to_string_lossy().into_owned()),
-            num_threads,
-            debug: false,
-            provider: Some("cpu".into()),
+        let config = OfflinePunctuationConfig {
+            model: OfflinePunctuationModelConfig {
+                ct_transformer: Some(model.to_string_lossy().into_owned()),
+                num_threads,
+                debug: false,
+                provider: Some("cpu".into()),
+            },
         };
 
         let engine = OfflinePunctuation::create(&config)

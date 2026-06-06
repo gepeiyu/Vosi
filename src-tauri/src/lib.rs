@@ -6,6 +6,8 @@ pub mod config;
 pub mod hotkey;
 pub mod inject;
 pub mod log;
+pub mod notify;
+pub mod overlay;
 pub mod pipeline;
 pub mod post;
 
@@ -13,13 +15,19 @@ use app::state::AppState;
 use app::tray::{self, TrayStatus};
 use config::AppConfig;
 use hotkey::listener::{self, HotkeyEvent};
-use inject::{default_injector, method_from_config};
+use inject::{default_injector, inject_with_fallback, method_from_config};
+use notify::Notifier;
+use overlay::{OverlayController, OverlayState};
 use log::Logger;
 use asr::ModelManager;
 use pipeline::session::VoiceSession;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{mpsc, Arc};
 use std::thread;
+use std::time::{Duration, Instant};
+
+const MIN_HOLD_MS: u64 = 300;
 use tauri::menu::{Menu, MenuItem};
 use tauri::Manager;
 
@@ -40,16 +48,24 @@ fn dev_models_dir() -> Option<PathBuf> {
     None
 }
 
+fn schedule_tray_reset(app: tauri::AppHandle, secs: u64) {
+    thread::spawn(move || {
+        thread::sleep(Duration::from_secs(secs));
+        tray::set_status(&app, TrayStatus::Idle);
+    });
+}
+
 fn spawn_voice_pipeline(
     app: tauri::AppHandle,
     config: AppConfig,
     bundled: PathBuf,
     dev_models: Option<PathBuf>,
     logger: Arc<Logger>,
+    overlay: OverlayController,
+    notifier: Notifier,
 ) {
     let (hotkey_tx, hotkey_rx) = mpsc::channel::<HotkeyEvent>();
-    let trigger = listener::key_from_name(&config.hotkey.trigger_key);
-    listener::spawn_hotkey_listener(trigger, hotkey_tx);
+    listener::spawn_hotkey_listener(&config.hotkey.trigger_key, hotkey_tx);
 
     let inject_method = method_from_config(&config.inject.method);
     thread::spawn(move || {
@@ -64,33 +80,97 @@ fn spawn_voice_pipeline(
             Ok(session) => session,
             Err(err) => {
                 logger.error(&format!("voice pipeline unavailable: {err}"));
+                notifier.error("语音引擎不可用，请重新安装");
                 tray::set_status(&app, TrayStatus::Warning);
                 return;
             }
         };
 
+        let mut level_updates_active: Option<Arc<AtomicBool>> = None;
+        let mut press_started: Option<Instant> = None;
+
         while let Ok(event) = hotkey_rx.recv() {
             match event {
                 HotkeyEvent::Pressed => {
+                    logger.info("hotkey pressed");
+                    press_started = Some(Instant::now());
                     tray::set_status(&app, TrayStatus::Recording);
-                    if let Err(err) = session.on_hotkey_press() {
+                    overlay.emit(OverlayState::Recording { level: 0.0 });
+                    let level_active = Arc::new(AtomicBool::new(true));
+                    level_updates_active = Some(Arc::clone(&level_active));
+                    let (level_tx, level_rx) = mpsc::channel::<f32>();
+                    let level_overlay = overlay.clone();
+                    thread::spawn(move || {
+                        while let Ok(level) = level_rx.recv() {
+                            if !level_active.load(Ordering::Relaxed) {
+                                break;
+                            }
+                            level_overlay.emit(OverlayState::Recording { level });
+                        }
+                    });
+                    if let Err(err) = session.on_hotkey_press_with_level(Some(level_tx)) {
+                        press_started = None;
+                        if let Some(active) = level_updates_active.take() {
+                            active.store(false, Ordering::Relaxed);
+                        }
                         logger.error(&format!("recording start failed: {err}"));
+                        if err.contains("no input device") {
+                            notifier.error("未检测到麦克风");
+                        }
+                        overlay.emit(OverlayState::Hidden);
                         tray::set_status(&app, TrayStatus::Warning);
                     }
                 }
                 HotkeyEvent::Released => {
-                    tray::set_status(&app, TrayStatus::Idle);
+                    if let Some(active) = level_updates_active.take() {
+                        active.store(false, Ordering::Relaxed);
+                    }
+
+                    let held_ms = press_started
+                        .take()
+                        .map(|t| t.elapsed().as_millis())
+                        .unwrap_or(0);
+
+                    if held_ms < MIN_HOLD_MS as u128 {
+                        logger.info("hotkey tap ignored");
+                        session.cancel_recording();
+                        overlay.emit(OverlayState::Hidden);
+                        tray::set_status(&app, TrayStatus::Idle);
+                        continue;
+                    }
+
+                    logger.info("hotkey released");
+                    overlay.emit(OverlayState::Processing);
                     match session.on_hotkey_release() {
                         Ok(Some(text)) => {
-                            if let Err(err) = injector.inject(&text, inject_method) {
-                                logger.error(&format!("text injection failed: {err}"));
+                            let result =
+                                inject_with_fallback(injector.as_ref(), &text, inject_method);
+                            overlay.emit(OverlayState::Hidden);
+                            if !result.injected {
+                                logger.error(
+                                    "text injection failed: missing accessibility permission",
+                                );
+                                notifier.error("已复制到剪贴板，请手动粘贴");
                                 tray::set_status(&app, TrayStatus::Warning);
+                                schedule_tray_reset(app.clone(), 3);
+                            } else {
+                                tray::set_status(&app, TrayStatus::Idle);
                             }
                         }
-                        Ok(None) => {}
+                        Ok(None) => {
+                            overlay.emit(OverlayState::Hidden);
+                            tray::set_status(&app, TrayStatus::Idle);
+                        }
                         Err(err) => {
                             logger.error(&format!("voice pipeline error: {err}"));
+                            overlay.emit(OverlayState::Hidden);
+                            if err.contains("timeout") {
+                                notifier.error("识别超时，请重试");
+                            }
                             tray::set_status(&app, TrayStatus::Warning);
+                            if err.contains("timeout") {
+                                schedule_tray_reset(app.clone(), 3);
+                            }
                         }
                     }
                 }
@@ -124,9 +204,15 @@ pub fn run() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_notification::init())
         .manage(app_state)
         .setup(move |app| {
             setup_tray_menu(app)?;
+            let overlay = OverlayController::new(
+                app.handle().clone(),
+                config.overlay.enabled,
+            );
+            let notifier = Notifier::new(app.handle().clone());
             let bundled = app
                 .path()
                 .resource_dir()
@@ -138,13 +224,18 @@ pub fn run() {
                 bundled,
                 dev_models_dir(),
                 logger,
+                overlay,
+                notifier,
             );
             Ok(())
         })
-        .on_menu_event(|app, event| match event.id.as_ref() {
-            "show" => tray::show_settings_window(app),
-            "quit" => app.exit(0),
-            _ => {}
+        .on_menu_event(|app, event| {
+            let id = event.id().0.as_str();
+            match id {
+                "show" => tray::show_settings_window(app),
+                "quit" => app.exit(0),
+                other => eprintln!("unhandled tray menu item: {other}"),
+            }
         })
         .invoke_handler(tauri::generate_handler![
             commands::get_config,

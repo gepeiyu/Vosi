@@ -18,8 +18,28 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: ~/.cache/sherpa-onnx
-          key: sherpa-onnx-v1.13.2-osx-x64-${{ hashFiles('src-tauri/Cargo.lock') }}
-          restore-keys: sherpa-onnx-v1.13.2-osx-x64-
+          key: sherpa-onnx-v1.13.2-macos-${{ runner.arch }}-${{ hashFiles('src-tauri/Cargo.lock') }}
+          restore-keys: sherpa-onnx-v1.13.2-macos-${{ runner.arch }}-
+
+      - name: Download sherpa-onnx prebuilt libs
+        run: |
+          ARCHIVE_DIR="$HOME/.cache/sherpa-onnx"
+          echo "SHERPA_ONNX_ARCHIVE_DIR=$ARCHIVE_DIR" >> "$GITHUB_ENV"
+          mkdir -p "$ARCHIVE_DIR"
+          case "${{ runner.arch }}" in
+            ARM64) ARCH=arm64 ;;
+            X64) ARCH=x64 ;;
+            *)
+              echo "Unsupported runner arch: ${{ runner.arch }}"
+              exit 1
+              ;;
+          esac
+          ARCHIVE="sherpa-onnx-v1.13.2-osx-${ARCH}-static-lib.tar.bz2"
+          DEST="$ARCHIVE_DIR/$ARCHIVE"
+          if [ ! -f "$DEST" ]; then
+            curl -fsSL --retry 5 -o "$DEST" \
+              "https://github.com/k2-fsa/sherpa-onnx/releases/download/v1.13.2/$ARCHIVE"
+          fi
 
       - name: Offline runtime guard
         run: |
@@ -30,10 +50,6 @@ jobs:
 
       - name: Unit tests
         run: cd src-tauri && cargo test --lib
-        env:
-          SHERPA_ONNX_ARCHIVE_DIR: ~/.cache/sherpa-onnx
 
       - name: Clippy
         run: cd src-tauri && cargo clippy --lib -- -D warnings
-        env:
-          SHERPA_ONNX_ARCHIVE_DIR: ~/.cache/sherpa-onnx
