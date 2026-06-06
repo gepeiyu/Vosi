@@ -16,11 +16,11 @@ mod windows;
 pub fn default_injector() -> Box<dyn TextInjector> {
     #[cfg(target_os = "macos")]
     {
-        return Box::new(macos::MacInjector);
+        Box::new(macos::MacInjector)
     }
     #[cfg(target_os = "windows")]
     {
-        return Box::new(windows::WinInjector);
+        Box::new(windows::WinInjector)
     }
     #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     {

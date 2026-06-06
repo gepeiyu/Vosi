@@ -13,10 +13,7 @@ pub enum HotkeyEvent {
 
 pub fn spawn_hotkey_listener(trigger_name: &str, tx: Sender<HotkeyEvent>) {
     #[cfg(target_os = "macos")]
-    {
-        super::macos::spawn_listener(trigger_name, tx);
-        return;
-    }
+    super::macos::spawn_listener(trigger_name, tx);
 
     #[cfg(not(target_os = "macos"))]
     {
