@@ -12,6 +12,14 @@ pub fn config_path() -> PathBuf {
     config_dir().join("settings.toml")
 }
 
+fn migrate_config(mut cfg: AppConfig) -> AppConfig {
+    // 旧版跨平台默认 RightAlt → 各平台推荐键
+    if cfg.hotkey.trigger_key == "RightAlt" && cfg!(target_os = "macos") {
+        cfg.hotkey.trigger_key = types::default_trigger_key();
+    }
+    cfg
+}
+
 pub fn load() -> AppConfig {
     let path = config_path();
     if !path.exists() {
@@ -20,7 +28,10 @@ pub fn load() -> AppConfig {
         return cfg;
     }
     let raw = fs::read_to_string(&path).expect("read config");
-    toml::from_str(&raw).expect("parse config")
+    let cfg: AppConfig = toml::from_str(&raw).expect("parse config");
+    let cfg = migrate_config(cfg);
+    let _ = save(&cfg);
+    cfg
 }
 
 pub fn save(cfg: &AppConfig) -> std::io::Result<()> {

@@ -15,9 +15,19 @@ pub fn save_config(state: tauri::State<'_, AppState>, cfg: AppConfig) -> Result<
 pub fn get_accessibility_hint() -> Option<String> {
     #[cfg(target_os = "macos")]
     {
-        Some(
-            "Vosi 需要在「系统设置 → 隐私与安全性 → 辅助功能」中授权，才能将识别文字注入到当前应用。".into(),
-        )
+        let mut hint = String::from(
+            "Vosi 需要在「系统设置 → 隐私与安全性」中授权「辅助功能」和「麦克风」。\
+             开发模式（tauri dev）不会显示「Vosi」，请添加本进程可执行文件：",
+        );
+        if let Ok(exe) = std::env::current_exe() {
+            hint.push('\n');
+            hint.push_str(&exe.display().to_string());
+        }
+        hint.push_str(
+            "\n\n也可先按住触发键说话，系统弹出麦克风授权时再点允许。\
+             辅助功能需点「+」手动添加上述路径。",
+        );
+        Some(hint)
     }
     #[cfg(not(target_os = "macos"))]
     {

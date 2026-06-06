@@ -45,11 +45,20 @@ pub struct GeneralConfig {
     pub show_tray: bool,
 }
 
+/// macOS: 空格右侧 Command；Windows: 空格右侧 Alt
+pub fn default_trigger_key() -> String {
+    if cfg!(target_os = "macos") {
+        "RightCommand".into()
+    } else {
+        "RightAlt".into()
+    }
+}
+
 impl Default for AppConfig {
     fn default() -> Self {
         Self {
             hotkey: HotkeyConfig {
-                trigger_key: "RightAlt".into(),
+                trigger_key: default_trigger_key(),
                 mode: "hold".into(),
             },
             audio: AudioConfig {

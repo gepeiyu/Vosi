@@ -37,10 +37,21 @@ pub fn key_from_name(name: &str) -> Key {
     match name {
         "RightAlt" => Key::AltGr,
         "LeftAlt" => Key::Alt,
+        "RightCommand" | "RightMeta" | "MetaRight" => Key::MetaRight,
+        "LeftCommand" | "LeftMeta" | "MetaLeft" => Key::MetaLeft,
         "RightCtrl" => Key::ControlRight,
         "LeftCtrl" => Key::ControlLeft,
         "RightShift" => Key::ShiftRight,
         "LeftShift" => Key::ShiftLeft,
-        _ => Key::AltGr,
+        _ => {
+            #[cfg(target_os = "macos")]
+            {
+                Key::MetaRight
+            }
+            #[cfg(not(target_os = "macos"))]
+            {
+                Key::AltGr
+            }
+        }
     }
 }
