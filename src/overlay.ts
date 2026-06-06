@@ -10,18 +10,30 @@ const recordingView = document.getElementById("recording-view")!;
 const processingView = document.getElementById("processing-view")!;
 const bars = document.getElementById("bars")!;
 
-for (let i = 0; i < 5; i++) {
+const BAR_COUNT = 5;
+const BAR_MAX_PX = 22;
+const BAR_MIN_PX = 6;
+
+for (let i = 0; i < BAR_COUNT; i++) {
   const bar = document.createElement("div");
   bar.className = "bar";
   bars.appendChild(bar);
 }
 
+/** Boost quiet mic RMS so bars move visibly during normal speech. */
+function visualLevel(level: number): number {
+  const boosted = Math.pow(Math.max(level, 0.0001), 0.42) * 1.75;
+  return Math.min(1, boosted);
+}
+
 function setBars(level: number) {
+  const visual = visualLevel(level);
   const barEls = bars.querySelectorAll<HTMLDivElement>(".bar");
   barEls.forEach((bar, i) => {
-    const jitter = 0.85 + (i % 3) * 0.05;
-    const h = Math.max(20, Math.min(100, level * 100 * jitter));
-    bar.style.height = `${h}%`;
+    const jitter = 0.78 + (i % BAR_COUNT) * 0.07;
+    const h =
+      BAR_MIN_PX + visual * jitter * (BAR_MAX_PX - BAR_MIN_PX);
+    bar.style.height = `${Math.min(BAR_MAX_PX, h)}px`;
   });
 }
 

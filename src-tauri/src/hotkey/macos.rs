@@ -2,26 +2,37 @@ use super::listener::HotkeyEvent;
 use core_foundation::runloop::{kCFRunLoopCommonModes, CFRunLoop};
 use core_graphics::event::{
     CGEvent, CGEventTap, CGEventTapLocation, CGEventTapOptions, CGEventTapPlacement,
-    CGEventType, CallbackResult, EventField,
+    CGEventType, CallbackResult, EventField, CGEventFlags,
 };
 use std::cell::RefCell;
 use std::sync::mpsc::Sender;
 use std::thread;
-use std::time::Instant;
 
-#[link(name = "CoreGraphics", kind = "framework")]
-extern "C" {
-    fn CGEventSourceKeyState(state: i32, key: u16) -> bool;
+/// macOS virtual key codes (same as rdev / HIToolbox).
+fn keycodes_for_trigger(name: &str) -> Vec<i64> {
+    match name {
+        // Accept both command keys — users often press the left one.
+        "RightCommand" | "RightMeta" | "MetaRight" | "LeftCommand" | "LeftMeta" | "MetaLeft" => {
+            vec![54, 55]
+        }
+        "RightAlt" => vec![61],
+        "LeftAlt" => vec![58],
+        "RightCtrl" => vec![62],
+        "LeftCtrl" => vec![59],
+        "RightShift" => vec![60],
+        "LeftShift" => vec![56],
+        _ => vec![54, 55],
+    }
 }
 
-const HID_SYSTEM_STATE: i32 = 1;
-
 pub fn spawn_listener(trigger_name: &str, tx: Sender<HotkeyEvent>) {
-    let trigger_code = keycode_from_name(trigger_name);
+    let trigger_codes = keycodes_for_trigger(trigger_name);
     let trigger_label = trigger_name.to_string();
+    let codes_log = trigger_codes.clone();
     thread::spawn(move || {
-        let pressed_at = RefCell::new(None::<Instant>);
         let is_held = RefCell::new(false);
+        let last_flags = RefCell::new(CGEventFlags::CGEventFlagNull);
+
         let event_tap = match CGEventTap::new(
             CGEventTapLocation::HID,
             CGEventTapPlacement::HeadInsertEventTap,
@@ -35,25 +46,29 @@ pub fn spawn_listener(trigger_name: &str, tx: Sender<HotkeyEvent>) {
                     return CallbackResult::Keep;
                 }
 
+                let flags = event.get_flags();
+                let prev = *last_flags.borrow();
                 let keycode = event.get_integer_value_field(EventField::KEYBOARD_EVENT_KEYCODE);
-                if keycode != trigger_code {
+                if !trigger_codes.contains(&keycode) {
+                    *last_flags.borrow_mut() = flags;
                     return CallbackResult::Keep;
                 }
 
-                let down = is_key_pressed(trigger_code);
+                // Same edge detection as rdev (FlagsChanged branch in macos/common.rs).
+                let is_release = flags < prev;
+                *last_flags.borrow_mut() = flags;
                 let mut held = is_held.borrow_mut();
-                if down && !*held {
-                    *held = true;
-                    *pressed_at.borrow_mut() = Some(Instant::now());
-                    let _ = tx.send(HotkeyEvent::Pressed);
-                } else if !down && *held {
-                    *held = false;
-                    if let Some(t0) = pressed_at.borrow_mut().take() {
-                        if t0.elapsed().as_millis() >= 300 {
-                            let _ = tx.send(HotkeyEvent::Released);
-                        }
+
+                if is_release {
+                    if *held {
+                        *held = false;
+                        let _ = tx.send(HotkeyEvent::Released);
                     }
+                } else if !*held {
+                    *held = true;
+                    let _ = tx.send(HotkeyEvent::Pressed);
                 }
+
                 CallbackResult::Keep
             },
         ) {
@@ -68,7 +83,7 @@ pub fn spawn_listener(trigger_name: &str, tx: Sender<HotkeyEvent>) {
         };
 
         eprintln!(
-            "hotkey listener ready: {trigger_label} (keycode {trigger_code:#x}) via FlagsChanged"
+            "hotkey listener ready: {trigger_label} (keycodes {codes_log:?}) via FlagsChanged"
         );
 
         event_tap.enable();
@@ -81,22 +96,4 @@ pub fn spawn_listener(trigger_name: &str, tx: Sender<HotkeyEvent>) {
             CFRunLoop::run_current();
         }
     });
-}
-
-fn is_key_pressed(keycode: i64) -> bool {
-    unsafe { CGEventSourceKeyState(HID_SYSTEM_STATE, keycode as u16) }
-}
-
-fn keycode_from_name(name: &str) -> i64 {
-    match name {
-        "RightCommand" | "RightMeta" | "MetaRight" => 0x36,
-        "LeftCommand" | "LeftMeta" | "MetaLeft" => 0x37,
-        "RightAlt" => 0x3D,
-        "LeftAlt" => 0x3A,
-        "RightCtrl" => 0x3E,
-        "LeftCtrl" => 0x3B,
-        "RightShift" => 0x3C,
-        "LeftShift" => 0x38,
-        _ => 0x36,
-    }
 }

@@ -2,8 +2,6 @@ use std::sync::mpsc::Sender;
 
 #[cfg(not(target_os = "macos"))]
 use std::thread;
-#[cfg(not(target_os = "macos"))]
-use std::time::Instant;
 
 #[cfg(not(target_os = "macos"))]
 use rdev::{listen, Event, EventType, Key};
@@ -30,19 +28,13 @@ pub fn spawn_hotkey_listener(trigger_name: &str, tx: Sender<HotkeyEvent>) {
 #[cfg(not(target_os = "macos"))]
 fn spawn_rdev_listener(trigger: Key, tx: Sender<HotkeyEvent>) {
     thread::spawn(move || {
-        let mut pressed_at: Option<Instant> = None;
         let callback = move |event: Event| {
             match event.event_type {
                 EventType::KeyPress(key) if key == trigger => {
-                    pressed_at = Some(Instant::now());
                     let _ = tx.send(HotkeyEvent::Pressed);
                 }
                 EventType::KeyRelease(key) if key == trigger => {
-                    if let Some(t0) = pressed_at.take() {
-                        if t0.elapsed().as_millis() >= 300 {
-                            let _ = tx.send(HotkeyEvent::Released);
-                        }
-                    }
+                    let _ = tx.send(HotkeyEvent::Released);
                 }
                 _ => {}
             }

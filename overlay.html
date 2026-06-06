@@ -8,15 +8,19 @@
   <body>
     <div id="capsule" class="capsule hidden" aria-live="polite">
       <div class="capsule-inner">
-        <div id="recording-view" class="view hidden">
-          <span class="dot recording-dot"></span>
-          <span class="brand">Vosi</span>
+        <div id="recording-view" class="view view-recording hidden">
+          <div class="recording-leading">
+            <span class="recording-dot"></span>
+            <span class="brand">Vosi</span>
+          </div>
           <div class="bars" id="bars"></div>
         </div>
-        <div id="processing-view" class="view hidden">
+        <div id="processing-view" class="view view-processing hidden">
           <span class="ring"></span>
-          <span class="label">识别中…</span>
-          <div class="dots"><span></span><span></span><span></span></div>
+          <span class="status-text">
+            识别中
+            <span class="dots" aria-hidden="true"><span></span><span></span><span></span></span>
+          </span>
         </div>
       </div>
     </div>

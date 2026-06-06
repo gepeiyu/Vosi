@@ -87,6 +87,16 @@ impl VoiceSession {
         Ok(())
     }
 
+    /// Stop an in-progress recording without running ASR (e.g. accidental tap).
+    pub fn cancel_recording(&mut self) {
+        if let SessionState::Recording(capture) =
+            std::mem::replace(&mut self.state, SessionState::Idle)
+        {
+            drop(capture);
+            self.logger.info("recording cancelled");
+        }
+    }
+
     pub fn on_hotkey_release(&mut self) -> Result<Option<String>, String> {
         let capture = match std::mem::replace(&mut self.state, SessionState::Idle) {
             SessionState::Recording(c) => c,
