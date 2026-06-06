@@ -9,7 +9,7 @@ jobs:
   test:
     runs-on: macos-latest
     env:
-      SHERPA_ONNX_ARCHIVE_DIR: ~/.cache/sherpa-onnx
+      SHERPA_ONNX_ARCHIVE_DIR: ${{ env.HOME }}/.cache/sherpa-onnx
     steps:
       - uses: actions/checkout@v4
 
