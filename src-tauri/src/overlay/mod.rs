@@ -9,6 +9,7 @@ pub enum OverlayState {
     Processing,
 }
 
+#[derive(Clone)]
 pub struct OverlayController {
     app: AppHandle,
     enabled: bool,

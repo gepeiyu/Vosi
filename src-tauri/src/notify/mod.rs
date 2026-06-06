@@ -1,6 +1,7 @@
 use tauri::AppHandle;
 use tauri_plugin_notification::NotificationExt;
 
+#[derive(Clone)]
 pub struct Notifier {
     app: AppHandle,
 }
