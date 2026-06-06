@@ -6,6 +6,8 @@ pub struct AppConfig {
     pub hotword: HotwordConfig,
     pub inject: InjectConfig,
     pub general: GeneralConfig,
+    #[serde(default)]
+    pub overlay: OverlayConfig,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -45,6 +47,17 @@ pub struct GeneralConfig {
     pub show_tray: bool,
 }
 
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct OverlayConfig {
+    pub enabled: bool,
+}
+
+impl Default for OverlayConfig {
+    fn default() -> Self {
+        Self { enabled: true }
+    }
+}
+
 /// macOS: 空格右侧 Command；Windows: 空格右侧 Alt
 pub fn default_trigger_key() -> String {
     if cfg!(target_os = "macos") {
@@ -82,6 +95,7 @@ impl Default for AppConfig {
                 start_on_boot: true,
                 show_tray: true,
             },
+            overlay: OverlayConfig { enabled: true },
         }
     }
 }
