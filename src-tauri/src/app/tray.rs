@@ -1,5 +1,5 @@
 use tauri::image::Image;
-use tauri::{include_image, AppHandle, Manager, Runtime};
+use tauri::{include_image, ActivationPolicy, AppHandle, Manager, Runtime};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TrayStatus {
@@ -32,8 +32,21 @@ pub fn set_status<R: Runtime>(app: &AppHandle<R>, status: TrayStatus) {
 }
 
 pub fn show_settings_window<R: Runtime>(app: &AppHandle<R>) {
-    if let Some(window) = app.get_webview_window("main") {
-        let _ = window.show();
-        let _ = window.set_focus();
+    #[cfg(target_os = "macos")]
+    {
+        let _ = app.set_activation_policy(ActivationPolicy::Regular);
+        let _ = app.show();
     }
+
+    let Some(window) = app.get_webview_window("main") else {
+        eprintln!("settings window `main` not found");
+        return;
+    };
+
+    let _ = window.unminimize();
+    if let Err(err) = window.show() {
+        eprintln!("settings window show failed: {err}");
+        return;
+    }
+    let _ = window.set_focus();
 }

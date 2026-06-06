@@ -197,10 +197,13 @@ pub fn run() {
             );
             Ok(())
         })
-        .on_menu_event(|app, event| match event.id.as_ref() {
-            "show" => tray::show_settings_window(app),
-            "quit" => app.exit(0),
-            _ => {}
+        .on_menu_event(|app, event| {
+            let id = event.id().0.as_str();
+            match id {
+                "show" => tray::show_settings_window(app),
+                "quit" => app.exit(0),
+                other => eprintln!("unhandled tray menu item: {other}"),
+            }
         })
         .invoke_handler(tauri::generate_handler![
             commands::get_config,
