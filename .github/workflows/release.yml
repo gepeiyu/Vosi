@@ -8,6 +8,8 @@ on:
 jobs:
   build-macos:
     runs-on: macos-latest
+    env:
+      SHERPA_ONNX_ARCHIVE_DIR: ~/.cache/sherpa-onnx
     steps:
       - uses: actions/checkout@v4
 
@@ -21,8 +23,26 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: ~/.cache/sherpa-onnx
-          key: sherpa-onnx-v1.13.2-osx-x64-${{ hashFiles('src-tauri/Cargo.lock') }}
-          restore-keys: sherpa-onnx-v1.13.2-osx-x64-
+          key: sherpa-onnx-v1.13.2-macos-${{ runner.arch }}-${{ hashFiles('src-tauri/Cargo.lock') }}
+          restore-keys: sherpa-onnx-v1.13.2-macos-${{ runner.arch }}-
+
+      - name: Download sherpa-onnx prebuilt libs
+        run: |
+          mkdir -p "$HOME/.cache/sherpa-onnx"
+          case "${{ runner.arch }}" in
+            ARM64) ARCH=arm64 ;;
+            X64) ARCH=x64 ;;
+            *)
+              echo "Unsupported runner arch: ${{ runner.arch }}"
+              exit 1
+              ;;
+          esac
+          ARCHIVE="sherpa-onnx-v1.13.2-osx-${ARCH}-static-lib.tar.bz2"
+          DEST="$HOME/.cache/sherpa-onnx/$ARCHIVE"
+          if [ ! -f "$DEST" ]; then
+            curl -fsSL --retry 5 -o "$DEST" \
+              "https://github.com/k2-fsa/sherpa-onnx/releases/download/v1.13.2/$ARCHIVE"
+          fi
 
       - name: Install dependencies
         run: npm ci
@@ -36,8 +56,6 @@ jobs:
 
       - name: Build macOS app
         run: npm run tauri build
-        env:
-          SHERPA_ONNX_ARCHIVE_DIR: ~/.cache/sherpa-onnx
 
       - uses: actions/upload-artifact@v4
         with:
