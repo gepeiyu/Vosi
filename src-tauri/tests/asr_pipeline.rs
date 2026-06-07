@@ -1,11 +1,11 @@
-use tauri_app_lib::asr::engine::AsrEngine;
-use tauri_app_lib::asr::paths::{resolve_paraformer_paths, resolve_punctuation_model};
+use tauri_app_lib::asr::engine::{AsrEngine, AsrEngineOptions};
+use tauri_app_lib::asr::paths::{resolve_punctuation_model, resolve_sense_voice_paths};
 use tauri_app_lib::asr::punctuation::PunctuationEngine;
 
 #[test]
 fn resolve_paths_helpers_work_without_models() {
     let dir = tempfile::tempdir().unwrap();
-    assert!(resolve_paraformer_paths(dir.path()).is_err());
+    assert!(resolve_sense_voice_paths(dir.path()).is_err());
     assert!(resolve_punctuation_model(dir.path()).is_err());
 }
 
@@ -13,17 +13,25 @@ fn resolve_paths_helpers_work_without_models() {
 #[ignore = "requires downloaded models at models/dev/"]
 fn asr_pipeline_produces_text_from_fixture() {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../models/dev");
-    let paraformer_dir = root.join("paraformer-zh");
+    let sense_voice_dir = root.join("sense-voice");
     let punc_dir = root.join("punctuation");
     let wav = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../tests/fixtures/audio/short_greeting.wav");
 
-    if !paraformer_dir.exists() {
-        eprintln!("skip: models not downloaded");
+    if !sense_voice_dir.exists() {
+        eprintln!("skip: sense-voice models not downloaded");
         return;
     }
 
-    let engine = AsrEngine::new(&paraformer_dir, 2).expect("asr engine");
+    let engine = AsrEngine::new(
+        &sense_voice_dir,
+        2,
+        AsrEngineOptions {
+            language: "auto".into(),
+            use_itn: true,
+        },
+    )
+    .expect("asr engine");
     let punct = PunctuationEngine::new(&punc_dir, 1).expect("punctuation engine");
 
     if !wav.exists() {
