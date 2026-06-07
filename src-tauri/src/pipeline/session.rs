@@ -97,6 +97,10 @@ impl VoiceSession {
         }
     }
 
+    pub fn is_recording(&self) -> bool {
+        matches!(self.state, SessionState::Recording(_))
+    }
+
     pub fn on_hotkey_release(&mut self) -> Result<Option<String>, String> {
         let capture = match std::mem::replace(&mut self.state, SessionState::Idle) {
             SessionState::Recording(c) => c,

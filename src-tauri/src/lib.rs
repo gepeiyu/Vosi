@@ -28,6 +28,54 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 const MIN_HOLD_MS: u64 = 300;
+
+enum PipelineEvent {
+    Hotkey(HotkeyEvent),
+    BeginRecording { press_gen: u64 },
+}
+
+fn begin_recording(
+    session: &mut VoiceSession,
+    app: &tauri::AppHandle,
+    overlay: &OverlayController,
+    level_updates_active: &mut Option<Arc<AtomicBool>>,
+    logger: &Logger,
+    notifier: &Notifier,
+) -> Result<(), String> {
+    tray::set_status(app, TrayStatus::Recording);
+    overlay.emit(OverlayState::Recording { level: 0.0 });
+    let level_active = Arc::new(AtomicBool::new(true));
+    *level_updates_active = Some(Arc::clone(&level_active));
+    let (level_tx, level_rx) = mpsc::channel::<f32>();
+    let level_overlay = overlay.clone();
+    thread::spawn(move || {
+        while let Ok(level) = level_rx.recv() {
+            if !level_active.load(Ordering::Relaxed) {
+                break;
+            }
+            level_overlay.emit(OverlayState::Recording { level });
+        }
+    });
+    if let Err(err) = session.on_hotkey_press_with_level(Some(level_tx)) {
+        if let Some(active) = level_updates_active.take() {
+            active.store(false, Ordering::Relaxed);
+        }
+        logger.error(&format!("recording start failed: {err}"));
+        if err.contains("no input device") {
+            notifier.error("未检测到麦克风");
+        }
+        overlay.emit(OverlayState::Hidden);
+        tray::set_status(app, TrayStatus::Warning);
+        return Err(err);
+    }
+    Ok(())
+}
+
+fn stop_level_updates(level_updates_active: &mut Option<Arc<AtomicBool>>) {
+    if let Some(active) = level_updates_active.take() {
+        active.store(false, Ordering::Relaxed);
+    }
+}
 use tauri::menu::{Menu, MenuItem};
 use tauri::Manager;
 
@@ -65,7 +113,15 @@ fn spawn_voice_pipeline(
     notifier: Notifier,
 ) {
     let (hotkey_tx, hotkey_rx) = mpsc::channel::<HotkeyEvent>();
+    let (pipeline_tx, pipeline_rx) = mpsc::channel::<PipelineEvent>();
+    let hotkey_pipeline_tx = pipeline_tx.clone();
     listener::spawn_hotkey_listener(&config.hotkey.trigger_key, hotkey_tx);
+
+    thread::spawn(move || {
+        for event in hotkey_rx {
+            let _ = hotkey_pipeline_tx.send(PipelineEvent::Hotkey(event));
+        }
+    });
 
     let inject_method = method_from_config(&config.inject.method);
     thread::spawn(move || {
@@ -88,56 +144,72 @@ fn spawn_voice_pipeline(
 
         let mut level_updates_active: Option<Arc<AtomicBool>> = None;
         let mut press_started: Option<Instant> = None;
+        let mut press_gen: u64 = 0;
 
-        while let Ok(event) = hotkey_rx.recv() {
+        while let Ok(event) = pipeline_rx.recv() {
             match event {
-                HotkeyEvent::Pressed => {
+                PipelineEvent::Hotkey(HotkeyEvent::Pressed) => {
+                    if session.is_recording() {
+                        continue;
+                    }
                     logger.info("hotkey pressed");
+                    press_gen += 1;
+                    let my_gen = press_gen;
                     press_started = Some(Instant::now());
-                    tray::set_status(&app, TrayStatus::Recording);
-                    overlay.emit(OverlayState::Recording { level: 0.0 });
-                    let level_active = Arc::new(AtomicBool::new(true));
-                    level_updates_active = Some(Arc::clone(&level_active));
-                    let (level_tx, level_rx) = mpsc::channel::<f32>();
-                    let level_overlay = overlay.clone();
+                    let pipeline_tx = pipeline_tx.clone();
                     thread::spawn(move || {
-                        while let Ok(level) = level_rx.recv() {
-                            if !level_active.load(Ordering::Relaxed) {
-                                break;
-                            }
-                            level_overlay.emit(OverlayState::Recording { level });
-                        }
+                        thread::sleep(Duration::from_millis(MIN_HOLD_MS));
+                        let _ = pipeline_tx.send(PipelineEvent::BeginRecording { press_gen: my_gen });
                     });
-                    if let Err(err) = session.on_hotkey_press_with_level(Some(level_tx)) {
+                }
+                PipelineEvent::BeginRecording { press_gen: gen } => {
+                    if gen != press_gen || press_started.is_none() || session.is_recording() {
+                        continue;
+                    }
+                    logger.info("hotkey hold threshold reached");
+                    if begin_recording(
+                        &mut session,
+                        &app,
+                        &overlay,
+                        &mut level_updates_active,
+                        &logger,
+                        &notifier,
+                    )
+                    .is_err()
+                    {
                         press_started = None;
-                        if let Some(active) = level_updates_active.take() {
-                            active.store(false, Ordering::Relaxed);
-                        }
-                        logger.error(&format!("recording start failed: {err}"));
-                        if err.contains("no input device") {
-                            notifier.error("未检测到麦克风");
-                        }
-                        overlay.emit(OverlayState::Hidden);
-                        tray::set_status(&app, TrayStatus::Warning);
+                        press_gen += 1;
                     }
                 }
-                HotkeyEvent::Released => {
-                    if let Some(active) = level_updates_active.take() {
-                        active.store(false, Ordering::Relaxed);
-                    }
+                PipelineEvent::Hotkey(HotkeyEvent::Released) => {
+                    press_gen += 1;
 
                     let held_ms = press_started
                         .take()
                         .map(|t| t.elapsed().as_millis())
                         .unwrap_or(0);
 
-                    if held_ms < MIN_HOLD_MS as u128 {
-                        logger.info("hotkey tap ignored");
-                        session.cancel_recording();
-                        overlay.emit(OverlayState::Hidden);
-                        tray::set_status(&app, TrayStatus::Idle);
-                        continue;
+                    if !session.is_recording() {
+                        if held_ms < MIN_HOLD_MS as u128 {
+                            logger.info("hotkey tap ignored");
+                            continue;
+                        }
+                        logger.info("hotkey hold threshold reached on release");
+                        if begin_recording(
+                            &mut session,
+                            &app,
+                            &overlay,
+                            &mut level_updates_active,
+                            &logger,
+                            &notifier,
+                        )
+                        .is_err()
+                        {
+                            continue;
+                        }
                     }
+
+                    stop_level_updates(&mut level_updates_active);
 
                     logger.info("hotkey released");
                     overlay.emit(OverlayState::Processing);

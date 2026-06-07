@@ -11,17 +11,15 @@ use std::thread;
 /// macOS virtual key codes (same as rdev / HIToolbox).
 fn keycodes_for_trigger(name: &str) -> Vec<i64> {
     match name {
-        // Accept both command keys — users often press the left one.
-        "RightCommand" | "RightMeta" | "MetaRight" | "LeftCommand" | "LeftMeta" | "MetaLeft" => {
-            vec![54, 55]
-        }
+        "RightCommand" | "RightMeta" | "MetaRight" => vec![54],
+        "LeftCommand" | "LeftMeta" | "MetaLeft" => vec![55],
         "RightAlt" => vec![61],
         "LeftAlt" => vec![58],
         "RightCtrl" => vec![62],
         "LeftCtrl" => vec![59],
         "RightShift" => vec![60],
         "LeftShift" => vec![56],
-        _ => vec![54, 55],
+        _ => vec![54],
     }
 }
 
