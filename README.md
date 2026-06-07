@@ -9,6 +9,7 @@ Powered by [FunASR](https://github.com/modelscope/FunASR) models, built on [sher
 ![License](https://img.shields.io/badge/license-Apache--2.0-blue)
 ![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows-lightgrey)
 ![Rust](https://img.shields.io/badge/rust-stable-orange)
+![Release](https://img.shields.io/github/v/release/gepeiyu/Vosi?label=v0.1.0)
 
 ## Features (v0.1)
 
@@ -34,11 +35,14 @@ See [docs/guides/quick-start.md](docs/guides/quick-start.md) for permissions and
 
 | Doc | Description |
 |-----|-------------|
-| [Design spec](docs/specs/2026-06-05-vosi-v01-design.md) | v0.1 product & architecture |
-| [Implementation plan](docs/plans/2026-06-05-vosi-v01.md) | Task breakdown |
+| [**Project summary**](docs/PROJECT-SUMMARY.md) | Dev, models, permissions, release — start here |
 | [Quick start (zh)](docs/guides/quick-start.md) | Install & first dictation |
+| [Design spec](docs/specs/2026-06-05-vosi-v01-design.md) | v0.1 product & architecture |
 | [Model list](docs/guides/model-list.md) | FunASR / sherpa-onnx models |
 | [Manual test checklist](docs/guides/manual-test-checklist.md) | Pre-release QA |
+| [Docs index](docs/README.md) | Full documentation map |
+
+**Repository:** https://github.com/gepeiyu/Vosi · **Release:** [v0.1.0](https://github.com/gepeiyu/Vosi/releases/tag/v0.1.0)
 
 ## Project structure
 

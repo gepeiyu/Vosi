@@ -8,6 +8,7 @@ Powered by FunASR 模型，基于 sherpa-onnx 推理。
 
 ![License](https://img.shields.io/badge/license-Apache--2.0-blue)
 ![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows-lightgrey)
+![Release](https://img.shields.io/github/v/release/gepeiyu/Vosi?label=v0.1.0)
 
 ## 功能（v0.1）
 
@@ -34,10 +35,12 @@ npm run tauri dev
 
 ## 文档
 
+- [**项目总结**](docs/PROJECT-SUMMARY.md) — 开发、模型、权限、发版一站式参考
+- [快速上手](docs/guides/quick-start.md)
 - [设计规格](docs/specs/2026-06-05-vosi-v01-design.md)
-- [实现计划](docs/plans/2026-06-05-vosi-v01.md)
 - [模型清单](docs/guides/model-list.md)
 - [手动测试清单](docs/guides/manual-test-checklist.md)
+- [文档索引](docs/README.md)
 
 ## 许可证
 

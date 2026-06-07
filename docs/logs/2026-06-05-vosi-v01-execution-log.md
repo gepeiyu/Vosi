@@ -54,11 +54,20 @@ npm run tauri dev
 - **模型镜像**：魔搭 FunASR ONNX 与 sherpa-onnx 不兼容；ASR/标点须 csukuangfj 预打包格式
 - **下载脚本**：`VOSI_PROXY` + `hf-mirror` / HuggingFace 双通道
 - **开发体验**：debug 构建自动将 `models/dev/` 复制到 `~/Library/Application Support/vosi/models/`
-- **待用户手动**：按住说话 E2E、macOS 麦克风/辅助功能权限、Golden WAV 本地录制替换占位文件
+- **默认热键**：macOS 右 Command / Windows 右 Alt（commit `360b08a`）
+- **macOS E2E**：用户确认按住说话 + 文本注入正常（2026-06-06）
+- **GitHub 开源**：`main` 推送 + tag [v0.1.0](https://github.com/gepeiyu/Vosi/releases/tag/v0.1.0)（2026-06-06）
+
+## v0.1 后续（2026-06-07）
+
+v0.1.1 polish 在 `feat/v0.1.1-polish` 分支继续，详见：
+
+- [2026-06-07-v01-polish-wrap-up.md](2026-06-07-v01-polish-wrap-up.md)
+- 总览：[../PROJECT-SUMMARY.md](../PROJECT-SUMMARY.md)
 
 ## v0.1 全部 Task 完成
 
 ```
 Task 1–16 ✅
-收尾验证 ✅（ASR 集成测试 + tauri dev 启动）
+收尾验证 ✅（ASR 集成测试 + macOS E2E + GitHub v0.1.0 开源）
 ```
