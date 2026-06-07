@@ -105,9 +105,11 @@ VOSI_MODEL_MIRROR=hf-mirror ./scripts/download-models.sh
 
 | 角色 | 文件 | 大小 | 来源 |
 |------|------|------|------|
-| ASR | `paraformer-zh/model.int8.onnx` + `tokens.txt` | ~78MB | [csukuangfj/sherpa-onnx-paraformer-zh-small](https://huggingface.co/csukuangfj/sherpa-onnx-paraformer-zh-small-2024-03-09) |
+| ASR | `sense-voice/model.int8.onnx` + `tokens.txt` | ~228MB | [csukuangfj/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17](https://huggingface.co/csukuangfj/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17) |
 | 标点 | `punctuation/model.onnx` | ~281MB | [csukuangfj/sherpa-onnx-punct-ct-transformer](https://huggingface.co/csukuangfj/sherpa-onnx-punct-ct-transformer-zh-en-vocab272727-2024-04-12) |
 | VAD | `vad/model.onnx` | ~629KB | GitHub `silero_vad.onnx` |
+
+安装包体积：不含标点约 **~230MB**（ASR + VAD）；含标点约 **~510MB**。
 
 安装目录：`models/dev/`（开发）→ `prepare-bundle-models.sh` → `src-tauri/models/bundled/`（Release 打包）。
 
