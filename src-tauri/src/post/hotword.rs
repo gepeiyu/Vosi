@@ -40,9 +40,55 @@ impl HotwordReplacer {
     }
 }
 
+pub fn merge_builtin_hotwords(user_path: &Path, builtin_lines: &[&str]) -> std::io::Result<()> {
+    let existing = std::fs::read_to_string(user_path).unwrap_or_default();
+    let existing_set: HashSet<String> = existing
+        .lines()
+        .map(|l| l.trim().to_string())
+        .filter(|l| !l.is_empty())
+        .collect();
+
+    let mut additions = Vec::new();
+    for word in builtin_lines {
+        let w = word.trim();
+        if w.is_empty() {
+            continue;
+        }
+        if !existing_set.contains(w) {
+            additions.push(w);
+        }
+    }
+    if additions.is_empty() {
+        return Ok(());
+    }
+    if let Some(parent) = user_path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    use std::io::Write;
+    let mut file = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(user_path)?;
+    for word in additions {
+        writeln!(file, "{word}")?;
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn merge_builtin_hotwords_appends_without_duplicates() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("hotwords.txt");
+        std::fs::write(&path, "React\n").unwrap();
+        merge_builtin_hotwords(&path, &["React", "TypeScript"]).unwrap();
+        let content = std::fs::read_to_string(&path).unwrap();
+        assert_eq!(content.matches("React").count(), 1);
+        assert!(content.contains("TypeScript"));
+    }
 
     #[test]
     fn replaces_fuzzy_token_with_hotword() {

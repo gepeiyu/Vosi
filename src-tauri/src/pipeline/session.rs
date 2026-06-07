@@ -6,7 +6,7 @@ use crate::audio::resample::resample_linear;
 use crate::audio::vad::VadEngine;
 use crate::config::AppConfig;
 use crate::log::Logger;
-use crate::post::hotword::HotwordReplacer;
+use crate::post::hotword::{merge_builtin_hotwords, HotwordReplacer};
 use crate::post::pipeline::post_process;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc;
@@ -69,7 +69,14 @@ impl VoiceSession {
         } else {
             None
         };
+        const BUILTIN_HOTWORDS: &str = include_str!("../../resources/hotwords-tech.txt");
         let hotword_path = expand_tilde(&config.hotword.file);
+        let builtin: Vec<&str> = BUILTIN_HOTWORDS
+            .lines()
+            .map(|l| l.trim())
+            .filter(|l| !l.is_empty())
+            .collect();
+        let _ = merge_builtin_hotwords(&hotword_path, &builtin);
         let hotwords = HotwordReplacer::from_file(&hotword_path)
             .unwrap_or_else(|_| HotwordReplacer::from_lines(vec![]));
 
