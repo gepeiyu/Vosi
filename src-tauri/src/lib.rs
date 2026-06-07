@@ -8,6 +8,7 @@ pub mod inject;
 pub mod log;
 pub mod notify;
 pub mod overlay;
+pub mod permissions;
 pub mod pipeline;
 pub mod post;
 
@@ -19,7 +20,6 @@ use inject::{default_injector, inject_with_fallback, method_from_config};
 use notify::Notifier;
 use overlay::{OverlayController, OverlayState};
 use log::Logger;
-use asr::ModelManager;
 use pipeline::session::VoiceSession;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -89,7 +89,7 @@ fn dev_models_dir() -> Option<PathBuf> {
     #[cfg(debug_assertions)]
     {
         let dev = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../models/dev");
-        if ModelManager::paraformer_ready(&dev) {
+        if crate::asr::ModelManager::paraformer_ready(&dev) {
             return Some(dev);
         }
     }
@@ -219,10 +219,17 @@ fn spawn_voice_pipeline(
                                 inject_with_fallback(injector.as_ref(), &text, inject_method);
                             overlay.emit(OverlayState::Hidden);
                             if !result.injected {
-                                logger.error(
-                                    "text injection failed: missing accessibility permission",
-                                );
-                                notifier.error("已复制到剪贴板，请手动粘贴");
+                                let detail = result.error.as_deref().unwrap_or("unknown");
+                                logger.error(&format!("text injection failed: {detail}"));
+                                if cfg!(target_os = "macos")
+                                    && !crate::permissions::is_accessibility_trusted()
+                                {
+                                    notifier.error(
+                                        "文本注入失败：请重新授权辅助功能（关闭后重新打开 Vosi 开关）",
+                                    );
+                                } else {
+                                    notifier.error("已复制到剪贴板，请手动粘贴");
+                                }
                                 tray::set_status(&app, TrayStatus::Warning);
                                 schedule_tray_reset(app.clone(), 3);
                             } else {
@@ -258,8 +265,37 @@ fn setup_tray_menu(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     if let Some(tray) = app.tray_by_id("main") {
         tray.set_menu(Some(menu))?;
     }
-    tray::set_status(app.handle(), TrayStatus::Idle);
     Ok(())
+}
+
+pub fn try_start_voice_pipeline(app: &tauri::AppHandle, state: &AppState) -> bool {
+    if state.voice_ready() {
+        return true;
+    }
+    if !permissions::all_granted() {
+        return false;
+    }
+    let Some(logger) = state.logger() else {
+        return false;
+    };
+    let Some(bundled) = state.bundled() else {
+        return false;
+    };
+    let config = state.get_config();
+    let overlay = OverlayController::new(app.clone(), config.overlay.enabled);
+    let notifier = Notifier::new(app.clone());
+    spawn_voice_pipeline(
+        app.clone(),
+        config,
+        bundled,
+        state.dev_models(),
+        logger,
+        overlay,
+        notifier,
+    );
+    state.mark_pipeline_started();
+    tray::set_status(app, TrayStatus::Idle);
+    true
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -279,26 +315,24 @@ pub fn run() {
         .plugin(tauri_plugin_notification::init())
         .manage(app_state)
         .setup(move |app| {
+            tray::configure_background_app(app.handle());
             setup_tray_menu(app)?;
-            let overlay = OverlayController::new(
-                app.handle().clone(),
-                config.overlay.enabled,
-            );
-            let notifier = Notifier::new(app.handle().clone());
             let bundled = app
                 .path()
                 .resource_dir()
                 .map(|dir| dir.join("models/bundled"))
                 .unwrap_or_else(|_| PathBuf::from("models/bundled"));
-            spawn_voice_pipeline(
-                app.handle().clone(),
-                config,
+            app.state::<AppState>().init_runtime(
+                logger.clone(),
                 bundled,
                 dev_models_dir(),
-                logger,
-                overlay,
-                notifier,
             );
+            let ready = permissions::run_startup_gate(app.handle(), logger.clone());
+            if ready {
+                try_start_voice_pipeline(app.handle(), app.state::<AppState>().inner());
+            } else {
+                logger.info("voice pipeline waiting for permissions");
+            }
             Ok(())
         })
         .on_menu_event(|app, event| {
@@ -312,8 +346,9 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::get_config,
             commands::save_config,
-            commands::get_accessibility_hint,
-            commands::open_accessibility_settings,
+            commands::get_permissions_status,
+            commands::open_permission_settings,
+            commands::recheck_permissions,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

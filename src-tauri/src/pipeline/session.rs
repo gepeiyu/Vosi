@@ -2,6 +2,7 @@ use crate::asr::engine::AsrEngine;
 use crate::asr::punctuation::PunctuationEngine;
 use crate::asr::ModelManager;
 use crate::audio::capture::AudioCapture;
+use crate::audio::resample::resample_linear;
 use crate::audio::vad::VadEngine;
 use crate::config::AppConfig;
 use crate::log::Logger;
@@ -117,6 +118,15 @@ impl VoiceSession {
 
         let sample_count = samples.len();
         let started = Instant::now();
+        let target_rate = self.config.audio.sample_rate;
+        let (samples, asr_rate) = if sample_rate != target_rate {
+            self.logger.info(&format!(
+                "resampling audio {sample_rate}Hz → {target_rate}Hz"
+            ));
+            (resample_linear(&samples, sample_rate, target_rate), target_rate)
+        } else {
+            (samples, sample_rate)
+        };
         let result = finalize_recording(
             &self.asr,
             &self.punc,
@@ -124,7 +134,8 @@ impl VoiceSession {
             &self.config,
             self.vad.as_ref(),
             samples,
-            sample_rate,
+            asr_rate,
+            &self.logger,
         );
         self.logger.info(&format!(
             "inference_ms={} sample_count={} sample_rate={}",
@@ -148,6 +159,7 @@ fn finalize_recording(
     vad_engine: Option<&VadEngine>,
     samples: Vec<f32>,
     sample_rate: u32,
+    logger: &Logger,
 ) -> Result<Option<String>, String> {
     let segments: Vec<Vec<f32>> = if config.asr.mode == "long" {
         if let Some(vad) = vad_engine {
@@ -177,6 +189,7 @@ fn finalize_recording(
                     if raw.trim().is_empty() {
                         return None;
                     }
+                    logger.info(&format!("asr raw: {}", truncate_log(&raw, 120)));
                     let punctuated = punc.punctuate(&raw);
                     Some(post_process(
                         &punctuated,
@@ -220,6 +233,13 @@ fn expand_tilde(path: &str) -> PathBuf {
     } else {
         PathBuf::from(path)
     }
+}
+
+fn truncate_log(text: &str, max_chars: usize) -> String {
+    if text.chars().count() <= max_chars {
+        return text.to_string();
+    }
+    format!("{}…", text.chars().take(max_chars).collect::<String>())
 }
 
 #[cfg(test)]

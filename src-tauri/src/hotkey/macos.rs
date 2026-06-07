@@ -1,97 +1,69 @@
 use super::listener::HotkeyEvent;
-use core_foundation::runloop::{kCFRunLoopCommonModes, CFRunLoop};
-use core_graphics::event::{
-    CGEvent, CGEventTap, CGEventTapLocation, CGEventTapOptions, CGEventTapPlacement,
-    CGEventType, CallbackResult, EventField, CGEventFlags,
-};
-use std::cell::RefCell;
+use crate::permissions::microphone_macos::{hotkey_set_keycode, hotkey_start, hotkey_stop};
 use std::sync::mpsc::Sender;
+use std::sync::{Mutex, OnceLock};
 use std::thread;
+use std::time::Duration;
 
-/// macOS virtual key codes (same as rdev / HIToolbox).
-fn keycodes_for_trigger(name: &str) -> Vec<i64> {
+static HOTKEY_TX: OnceLock<Mutex<Option<Sender<HotkeyEvent>>>> = OnceLock::new();
+
+extern "C" fn on_hotkey_event(event_type: i32) {
+    let event = if event_type == 0 {
+        HotkeyEvent::Pressed
+    } else {
+        HotkeyEvent::Released
+    };
+    if let Some(tx) = HOTKEY_TX
+        .get()
+        .and_then(|slot| slot.lock().ok())
+        .and_then(|guard| guard.as_ref().cloned())
+    {
+        let _ = tx.send(event);
+    }
+}
+
+fn keycode_for_trigger(name: &str) -> u16 {
     match name {
-        "RightCommand" | "RightMeta" | "MetaRight" => vec![54],
-        "LeftCommand" | "LeftMeta" | "MetaLeft" => vec![55],
-        "RightAlt" => vec![61],
-        "LeftAlt" => vec![58],
-        "RightCtrl" => vec![62],
-        "LeftCtrl" => vec![59],
-        "RightShift" => vec![60],
-        "LeftShift" => vec![56],
-        _ => vec![54],
+        "RightCommand" | "RightMeta" | "MetaRight" => 54,
+        "LeftCommand" | "LeftMeta" | "MetaLeft" => 55,
+        "RightAlt" => 61,
+        "LeftAlt" => 58,
+        "RightCtrl" => 62,
+        "LeftCtrl" => 59,
+        "RightShift" => 60,
+        "LeftShift" => 56,
+        _ => 54,
     }
 }
 
 pub fn spawn_listener(trigger_name: &str, tx: Sender<HotkeyEvent>) {
-    let trigger_codes = keycodes_for_trigger(trigger_name);
     let trigger_label = trigger_name.to_string();
-    let codes_log = trigger_codes.clone();
+    let keycode = keycode_for_trigger(trigger_name);
+    let _ = HOTKEY_TX.set(Mutex::new(Some(tx)));
+
     thread::spawn(move || {
-        let is_held = RefCell::new(false);
-        let last_flags = RefCell::new(CGEventFlags::CGEventFlagNull);
-
-        let event_tap = match CGEventTap::new(
-            CGEventTapLocation::HID,
-            CGEventTapPlacement::HeadInsertEventTap,
-            CGEventTapOptions::ListenOnly,
-            vec![CGEventType::FlagsChanged],
-            move |_proxy, event_type, event: &CGEvent| {
-                if matches!(
-                    event_type,
-                    CGEventType::TapDisabledByTimeout | CGEventType::TapDisabledByUserInput
-                ) {
-                    return CallbackResult::Keep;
-                }
-
-                let flags = event.get_flags();
-                let prev = *last_flags.borrow();
-                let keycode = event.get_integer_value_field(EventField::KEYBOARD_EVENT_KEYCODE);
-                if !trigger_codes.contains(&keycode) {
-                    *last_flags.borrow_mut() = flags;
-                    return CallbackResult::Keep;
-                }
-
-                // Same edge detection as rdev (FlagsChanged branch in macos/common.rs).
-                let is_release = flags < prev;
-                *last_flags.borrow_mut() = flags;
-                let mut held = is_held.borrow_mut();
-
-                if is_release {
-                    if *held {
-                        *held = false;
-                        let _ = tx.send(HotkeyEvent::Released);
-                    }
-                } else if !*held {
-                    *held = true;
-                    let _ = tx.send(HotkeyEvent::Pressed);
-                }
-
-                CallbackResult::Keep
-            },
-        ) {
-            Ok(tap) => tap,
-            Err(()) => {
+        hotkey_set_keycode(keycode);
+        loop {
+            if hotkey_start(on_hotkey_event) {
                 eprintln!(
-                    "hotkey listener: failed to create CGEventTap — add tauri-app to \
-                     System Settings → Privacy & Security → Accessibility"
+                    "hotkey listener ready: {trigger_label} (keycode {keycode}) via NSEvent global monitor"
                 );
-                return;
+                break;
             }
-        };
+            eprintln!(
+                "hotkey listener: waiting for Accessibility permission — \
+                 enable Vosi in System Settings → Privacy & Security → Accessibility"
+            );
+            thread::sleep(Duration::from_secs(2));
+        }
 
-        eprintln!(
-            "hotkey listener ready: {trigger_label} (keycodes {codes_log:?}) via FlagsChanged"
-        );
-
-        event_tap.enable();
-        unsafe {
-            let source = event_tap
-                .mach_port()
-                .create_runloop_source(0)
-                .expect("runloop source");
-            CFRunLoop::get_current().add_source(&source, kCFRunLoopCommonModes);
-            CFRunLoop::run_current();
+        loop {
+            thread::sleep(Duration::from_secs(3600));
         }
     });
+}
+
+#[allow(dead_code)]
+pub fn stop_listener() {
+    hotkey_stop();
 }

@@ -14,21 +14,95 @@ type AppConfig = {
   overlay: { enabled: boolean };
 };
 
+type PermissionsSnapshot = {
+  all_granted: boolean;
+  voice_ready: boolean;
+  permissions: Array<{
+    id: string;
+    label: string;
+    description: string;
+    granted: boolean;
+    action_label: string;
+  }>;
+  reinstall_tip: string | null;
+};
+
 function byId<T extends HTMLElement>(id: string): T {
   const el = document.getElementById(id);
   if (!el) throw new Error(`missing element #${id}`);
   return el as T;
 }
 
-async function loadAccessibilityBanner() {
-  const hint = await invoke<string | null>("get_accessibility_hint");
-  if (!hint) return;
-  const banner = byId<HTMLDivElement>("accessibility-banner");
-  byId<HTMLParagraphElement>("accessibility-text").textContent = hint;
-  banner.classList.remove("hidden");
-  byId<HTMLButtonElement>("open-accessibility").addEventListener("click", () => {
-    invoke("open_accessibility_settings").catch(console.error);
-  });
+function renderPermissions(snap: PermissionsSnapshot) {
+  const voiceStatus = byId<HTMLParagraphElement>("voice-ready-status");
+  voiceStatus.textContent = snap.voice_ready
+    ? "语音功能：就绪"
+    : snap.all_granted
+      ? "语音功能：启动中…"
+      : "语音功能：未就绪（请先开启下方全部权限）";
+  voiceStatus.className = `voice-ready-status${snap.voice_ready ? " is-ready" : " is-blocked"}`;
+
+  const list = byId<HTMLUListElement>("permissions-list");
+  list.replaceChildren(
+    ...snap.permissions.map((item) => {
+      const li = document.createElement("li");
+      li.className = `permission-row${item.granted ? " is-granted" : ""}`;
+
+      const name = document.createElement("span");
+      name.className = "permission-name";
+      name.textContent = item.label;
+
+      const desc = document.createElement("span");
+      desc.className = "permission-desc";
+      desc.textContent = item.description;
+
+      const status = document.createElement("span");
+      status.className = "permission-status";
+      status.textContent = item.granted ? "已授权" : "未授权";
+
+      li.append(name, desc, status);
+
+      if (!item.granted) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "secondary-btn permission-action";
+        btn.textContent = item.action_label || "去设置";
+        btn.addEventListener("click", async () => {
+          btn.disabled = true;
+          try {
+            await invoke("open_permission_settings", { permissionId: item.id });
+            byId<HTMLParagraphElement>("permissions-tip").textContent =
+              "已打开系统设置，请开启权限后返回并点击「重新检查权限」。";
+            byId<HTMLParagraphElement>("permissions-tip").classList.remove("hidden");
+          } catch (err) {
+            console.error(err);
+            byId<HTMLParagraphElement>("permissions-tip").textContent =
+              "无法打开系统设置，请手动前往：系统设置 → 隐私与安全性";
+            byId<HTMLParagraphElement>("permissions-tip").classList.remove("hidden");
+          } finally {
+            btn.disabled = false;
+          }
+        });
+        li.append(btn);
+      }
+
+      return li;
+    }),
+  );
+
+  const tip = byId<HTMLParagraphElement>("permissions-tip");
+  if (snap.reinstall_tip) {
+    tip.textContent = snap.reinstall_tip;
+    tip.classList.remove("hidden");
+  } else {
+    tip.textContent = "";
+    tip.classList.add("hidden");
+  }
+}
+
+async function loadPermissions() {
+  const snap = await invoke<PermissionsSnapshot>("get_permissions_status");
+  renderPermissions(snap);
 }
 
 function fillForm(cfg: AppConfig) {
@@ -106,6 +180,29 @@ async function loadSettings() {
 }
 
 window.addEventListener("DOMContentLoaded", () => {
-  loadAccessibilityBanner().catch(console.error);
+  loadPermissions().catch(console.error);
   loadSettings().catch(console.error);
+
+  byId<HTMLButtonElement>("recheck-permissions").addEventListener("click", async () => {
+    const btn = byId<HTMLButtonElement>("recheck-permissions");
+    btn.disabled = true;
+    btn.textContent = "检查中…";
+    try {
+      const snap = await invoke<PermissionsSnapshot>("recheck_permissions");
+      renderPermissions(snap);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "重新检查权限";
+    }
+  });
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") {
+      invoke<PermissionsSnapshot>("recheck_permissions")
+        .then(renderPermissions)
+        .catch(console.error);
+    }
+  });
 });

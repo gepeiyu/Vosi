@@ -158,12 +158,15 @@ npm run tauri dev
 
 ### 权限（macOS）
 
-| 权限 | 用途 |
-|------|------|
-| 麦克风 | 录音 |
-| 辅助功能 | CGEventTap 热键 + enigo 文本注入 |
+| 权限 | 用途 | 申请时机 |
+|------|------|----------|
+| 麦克风 | 录音 | 启动时 `AudioCapture::preflight_microphone()` 触发系统弹窗 |
+| 辅助功能 | CGEventTap 热键 + enigo 文本注入 | 启动时 `AXIsProcessTrustedWithOptions(prompt=true)` 弹出系统引导；未授权时热键线程每 2s 重试 |
 
-开发模式（`tauri dev`）在系统设置中可能显示为 **tauri-app** 可执行文件路径，而非 Vosi.app。Release 安装包为 **Vosi.app**。
+实现：`src-tauri/src/permissions/macos.rs`（`ensure_at_launch`）。
+
+- `src-tauri/Info.plist` 含 `NSMicrophoneUsageDescription`（Release 必需）。
+- 未授权时托盘切为警告态并发送系统通知；设置页提供「麦克风设置」「辅助功能设置」按钮。
 
 ---
 

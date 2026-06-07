@@ -1,9 +1,11 @@
 use crate::audio::level::rms_level;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
-use cpal::{Sample, SampleFormat, StreamConfig};
+use cpal::{Sample, SampleFormat, StreamConfig, SupportedStreamConfig};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
+
+const PREFERRED_SAMPLE_RATE: u32 = 16_000;
 
 pub struct AudioCapture {
     samples: Arc<Mutex<Vec<f32>>>,
@@ -17,16 +19,50 @@ impl AudioCapture {
     }
 
     pub fn start_with_level(
-        _target_sample_rate: u32,
+        target_sample_rate: u32,
+        level_tx: Option<Sender<f32>>,
+    ) -> Result<Self, String> {
+        let rate = if target_sample_rate > 0 {
+            target_sample_rate
+        } else {
+            PREFERRED_SAMPLE_RATE
+        };
+        Self::open_input_stream(rate, level_tx)
+    }
+
+    /// Open the default mic briefly so macOS/Windows shows the permission prompt at launch.
+    pub fn preflight_microphone() -> Result<(), String> {
+        let capture = Self::open_input_stream(PREFERRED_SAMPLE_RATE, None)?;
+        drop(capture);
+        Ok(())
+    }
+
+    fn pick_input_config(device: &cpal::Device, target_rate: u32) -> Result<SupportedStreamConfig, String> {
+        let configs: Vec<_> = device
+            .supported_input_configs()
+            .map_err(|e| e.to_string())?
+            .collect();
+
+        if let Some(range) = configs.iter().find(|range| {
+            range.min_sample_rate().0 <= target_rate && range.max_sample_rate().0 >= target_rate
+        }) {
+            return Ok(range.with_sample_rate(cpal::SampleRate(target_rate)));
+        }
+
+        device
+            .default_input_config()
+            .map_err(|e| e.to_string())
+    }
+
+    fn open_input_stream(
+        target_sample_rate: u32,
         level_tx: Option<Sender<f32>>,
     ) -> Result<Self, String> {
         let host = cpal::default_host();
         let device = host
             .default_input_device()
             .ok_or_else(|| "no input device".to_string())?;
-        let supported = device
-            .default_input_config()
-            .map_err(|e| e.to_string())?;
+        let supported = Self::pick_input_config(&device, target_sample_rate)?;
         let sample_format = supported.sample_format();
         let sample_rate = supported.sample_rate().0;
         let config: StreamConfig = supported.into();

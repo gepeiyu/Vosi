@@ -19,7 +19,8 @@
         "width": 480,
         "height": 640,
         "visible": false,
-        "decorations": true
+        "decorations": true,
+        "skipTaskbar": true
       },
       {
         "label": "overlay",
@@ -50,6 +51,10 @@
       "dmg",
       "nsis"
     ],
+    "macOS": {
+      "entitlements": "./Entitlements.plist",
+      "signingIdentity": "-"
+    },
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
