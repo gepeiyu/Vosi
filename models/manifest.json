@@ -1,5 +1,6 @@
 {
-  "version": "0.1.0",
+  "version": "0.2.0",
+  "default_asr": "sense-voice-int8",
   "default_mirror": "auto",
   "proxy_hint": "export VOSI_PROXY=http://127.0.0.1:7890",
   "mirrors": {
@@ -10,8 +11,17 @@
   },
   "models": [
     {
-      "id": "paraformer-zh-int8",
+      "id": "sense-voice-int8",
+      "dest": "models/dev/sense-voice",
+      "github": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17.tar.bz2",
+      "hf_mirror": "csukuangfj/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17",
+      "files": ["model.int8.onnx", "tokens.txt"],
+      "sha256": ""
+    },
+    {
+      "id": "paraformer-zh-int8-legacy",
       "dest": "models/dev/paraformer-zh",
+      "note": "测试期备份，验收后删除",
       "modelscope": "crazyant/speech_paraformer_asr_nat-zh-cn-16k-common-vocab8358-onnx",
       "hf_mirror": "csukuangfj/sherpa-onnx-paraformer-zh-small-2024-03-09",
       "github": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-paraformer-zh-small-2024-03-09.tar.bz2",

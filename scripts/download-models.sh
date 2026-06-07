@@ -120,6 +120,29 @@ use_foreign_first() {
   [[ -n "$PROXY" ]] || [[ "$MIRROR" == "github" ]]
 }
 
+download_sense_voice() {
+  local dest="$DEST_ROOT/sense-voice"
+  mkdir -p "$dest"
+
+  if use_foreign_first || [[ "$MIRROR" == "hf-mirror" ]] || [[ "$MIRROR" == "auto" ]]; then
+    if try_mirror hf \
+      download_hf_file "csukuangfj/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17" "model.int8.onnx" "$dest/model.int8.onnx" \
+      && download_hf_file "csukuangfj/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17" "tokens.txt" "$dest/tokens.txt"; then
+      return 0
+    fi
+    [[ "$MIRROR" == "hf-mirror" ]] && return 1
+  fi
+
+  if [[ "$MIRROR" == "github" ]] || [[ "$MIRROR" == "auto" ]]; then
+    try_mirror github download_github \
+      "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17.tar.bz2" \
+      "$dest" && return 0
+    [[ "$MIRROR" == "github" ]] && return 1
+  fi
+
+  return 1
+}
+
 # sherpa 预打包 INT8 小模型（与 sherpa-onnx 兼容；魔搭 FunASR ONNX 缺 metadata 不可用）
 download_paraformer() {
   local dest="$DEST_ROOT/paraformer-zh"
@@ -198,7 +221,8 @@ setup_proxy_env
 mkdir -p "$DEST_ROOT"
 log "mirror=$MIRROR dest=$DEST_ROOT"
 
-download_paraformer
+download_sense_voice
+download_paraformer   # 测试期保留备份
 download_vad
 download_punctuation
 
