@@ -1,4 +1,4 @@
-use crate::asr::engine::AsrEngine;
+use crate::asr::engine::{AsrEngine, AsrEngineOptions};
 use crate::asr::punctuation::PunctuationEngine;
 use crate::asr::ModelManager;
 use crate::audio::capture::AudioCapture;
@@ -22,7 +22,7 @@ pub enum SessionState {
 
 pub struct VoiceSession {
     asr: AsrEngine,
-    punc: PunctuationEngine,
+    punc: Option<PunctuationEngine>,
     hotwords: HotwordReplacer,
     config: AppConfig,
     logger: Arc<Logger>,
@@ -42,8 +42,33 @@ impl VoiceSession {
         let paths = mgr
             .ensure_installed(bundled, dev_models)
             .map_err(|e| e.to_string())?;
-        let asr = AsrEngine::new(&paths.paraformer_dir, config.asr.num_threads as i32)?;
-        let punc = PunctuationEngine::new(&paths.punc_dir, config.asr.num_threads as i32)?;
+        let (asr_dir, is_legacy) = ModelManager::active_asr_dir(&paths);
+        if is_legacy {
+            logger.info("sense-voice model not found; legacy paraformer fallback not supported");
+            return Err(
+                "sense-voice model not found — run ./scripts/download-models.sh to install"
+                    .into(),
+            );
+        }
+        let asr = AsrEngine::new(
+            &asr_dir,
+            config.asr.num_threads as i32,
+            AsrEngineOptions {
+                language: config.asr.language.clone(),
+                use_itn: config.asr.use_itn,
+            },
+        )?;
+        let punc = if config.asr.punctuation_enabled {
+            match PunctuationEngine::new(&paths.punc_dir, config.asr.num_threads as i32) {
+                Ok(engine) => Some(engine),
+                Err(e) => {
+                    logger.info(&format!("punctuation engine unavailable: {e}"));
+                    None
+                }
+            }
+        } else {
+            None
+        };
         let hotword_path = expand_tilde(&config.hotword.file);
         let hotwords = HotwordReplacer::from_file(&hotword_path)
             .unwrap_or_else(|_| HotwordReplacer::from_lines(vec![]));
@@ -129,7 +154,7 @@ impl VoiceSession {
         };
         let result = finalize_recording(
             &self.asr,
-            &self.punc,
+            self.punc.as_ref(),
             &self.hotwords,
             &self.config,
             self.vad.as_ref(),
@@ -153,7 +178,7 @@ pub fn join_segments(parts: &[String]) -> String {
 
 fn finalize_recording(
     asr: &AsrEngine,
-    punc: &PunctuationEngine,
+    punc: Option<&PunctuationEngine>,
     hotwords: &HotwordReplacer,
     config: &AppConfig,
     vad_engine: Option<&VadEngine>,
@@ -190,7 +215,10 @@ fn finalize_recording(
                         return None;
                     }
                     logger.info(&format!("asr raw: {}", truncate_log(&raw, 120)));
-                    let punctuated = punc.punctuate(&raw);
+                    let punctuated = match punc {
+                        Some(engine) => engine.punctuate(&raw),
+                        None => raw.clone(),
+                    };
                     Some(post_process(
                         &punctuated,
                         hotwords,
