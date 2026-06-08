@@ -1,8 +1,10 @@
 use tauri::image::Image;
-use tauri::{include_image, ActivationPolicy, AppHandle, Manager, Runtime, WebviewWindow, Window};
+use tauri::{include_image, AppHandle, Manager, Runtime, WebviewWindow, Window};
 
 #[cfg(target_os = "macos")]
 use crate::permissions::microphone_macos::activate_app;
+#[cfg(target_os = "macos")]
+use tauri::ActivationPolicy;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TrayStatus {
