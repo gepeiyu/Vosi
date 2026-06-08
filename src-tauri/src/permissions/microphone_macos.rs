@@ -15,7 +15,7 @@ extern "C" {
     fn vosi_prompt_microphone_denied() -> bool;
     fn vosi_activate_app() -> bool;
     fn vosi_is_accessibility_trusted() -> bool;
-    fn vosi_request_accessibility() -> bool;
+    fn vosi_repair_accessibility(reset_tcc: bool) -> bool;
     fn vosi_hotkey_set_keycode(code: u16);
     fn vosi_hotkey_start(callback: extern "C" fn(event_type: i32)) -> bool;
     fn vosi_hotkey_stop();
@@ -59,8 +59,9 @@ pub fn is_accessibility_trusted() -> bool {
     unsafe { vosi_is_accessibility_trusted() }
 }
 
-pub fn request_accessibility() -> bool {
-    unsafe { vosi_request_accessibility() }
+/// Clear stale TCC entry (`tccutil reset`) then re-prompt and open System Settings.
+pub fn repair_accessibility(reset_tcc: bool) -> bool {
+    unsafe { vosi_repair_accessibility(reset_tcc) }
 }
 
 pub fn hotkey_set_keycode(code: u16) {

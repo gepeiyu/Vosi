@@ -170,38 +170,12 @@ download_vad() {
     "$dest"
 }
 
-# sherpa 标点模型（魔搭 model_quant.onnx 不兼容）
-download_punctuation() {
-  local dest="$DEST_ROOT/punctuation"
-  mkdir -p "$dest"
-  # 去掉不完整的 model.onnx 或魔搭 quant 残留，避免误用
-  rm -f "$dest/model.onnx" "$dest/model_quant.onnx"
-
-  if use_foreign_first || [[ "$MIRROR" == "hf-mirror" ]] || [[ "$MIRROR" == "auto" ]]; then
-    if try_mirror hf \
-      download_hf_file "csukuangfj/sherpa-onnx-punct-ct-transformer-zh-en-vocab272727-2024-04-12" "model.onnx" "$dest/model.onnx"; then
-      return 0
-    fi
-    [[ "$MIRROR" == "hf-mirror" ]] && return 1
-  fi
-
-  if [[ "$MIRROR" == "github" ]] || [[ "$MIRROR" == "auto" ]]; then
-    try_mirror github download_github \
-      "https://github.com/k2-fsa/sherpa-onnx/releases/download/punctuation-models/sherpa-onnx-punct-ct-transformer-zh-en-vocab272727-2024-04-12.tar.bz2" \
-      "$dest" && return 0
-    [[ "$MIRROR" == "github" ]] && return 1
-  fi
-
-  return 1
-}
-
 setup_proxy_env
 mkdir -p "$DEST_ROOT"
 log "mirror=$MIRROR dest=$DEST_ROOT"
 
 download_sense_voice
 download_vad
-download_punctuation
 
 log "Done → $DEST_ROOT"
 if [[ -z "$PROXY" ]]; then

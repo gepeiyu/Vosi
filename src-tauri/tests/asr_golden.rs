@@ -97,14 +97,3 @@ fn golden_all_cases() {
 
     assert!(ran > 0, "no golden WAV fixtures found — record audio per README.md");
 }
-
-/// Phase 1 punctuation comparison: run the same 15 golden cases with
-/// `punctuation_enabled=true` vs SenseVoice ITN-only output, then compare
-/// punctuation accuracy. Threshold ≥ 90% → default `punctuation_enabled=false`
-/// and remove CT-Transformer in Task 10; otherwise keep punctuation pipeline.
-#[test]
-#[ignore = "Phase 1 manual comparison — enable after golden WAV fixtures exist"]
-fn golden_punctuation_comparison() {
-    // TODO: transcribe each case twice (with/without PunctuationEngine),
-    // score punctuation against expected scripts in golden.json, log summary.
-}

@@ -5,7 +5,6 @@ use std::path::{Path, PathBuf};
 pub struct ModelPaths {
     pub sense_voice_dir: PathBuf,
     pub vad_model: PathBuf,
-    pub punc_dir: PathBuf,
 }
 
 pub struct ModelManager {
@@ -26,7 +25,6 @@ impl ModelManager {
         ModelPaths {
             sense_voice_dir: base.join("sense-voice"),
             vad_model: base.join("vad/model.onnx"),
-            punc_dir: base.join("punctuation"),
         }
     }
 
@@ -84,15 +82,17 @@ impl ModelManager {
             }
         }
 
-        remove_legacy_paraformer(&dest)?;
+        remove_legacy_models(&dest)?;
         Ok(self.resolve_paths())
     }
 }
 
-fn remove_legacy_paraformer(dest: &Path) -> std::io::Result<()> {
-    let legacy = dest.join("paraformer-zh");
-    if legacy.exists() {
-        std::fs::remove_dir_all(&legacy)?;
+fn remove_legacy_models(dest: &Path) -> std::io::Result<()> {
+    for name in ["paraformer-zh", "punctuation"] {
+        let path = dest.join(name);
+        if path.exists() {
+            std::fs::remove_dir_all(&path)?;
+        }
     }
     Ok(())
 }

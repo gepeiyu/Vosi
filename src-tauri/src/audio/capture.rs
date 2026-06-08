@@ -1,6 +1,6 @@
 use crate::audio::level::rms_level;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
-use cpal::{Sample, SampleFormat, StreamConfig, SupportedStreamConfig};
+use cpal::{Sample, SampleFormat, StreamConfig, SupportedStreamConfig, SupportedStreamConfigRange};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
@@ -38,20 +38,32 @@ impl AudioCapture {
     }
 
     fn pick_input_config(device: &cpal::Device, target_rate: u32) -> Result<SupportedStreamConfig, String> {
-        let configs: Vec<_> = device
+        let configs: Vec<SupportedStreamConfigRange> = device
             .supported_input_configs()
             .map_err(|e| e.to_string())?
             .collect();
 
-        if let Some(range) = configs.iter().find(|range| {
-            range.min_sample_rate().0 <= target_rate && range.max_sample_rate().0 >= target_rate
-        }) {
-            return Ok(range.with_sample_rate(cpal::SampleRate(target_rate)));
+        if configs.is_empty() {
+            return device.default_input_config().map_err(|e| e.to_string());
         }
 
-        device
-            .default_input_config()
-            .map_err(|e| e.to_string())
+        let best = configs
+            .iter()
+            .min_by_key(|range| {
+                let mono_penalty = if range.channels() == 1 { 0 } else { 10 };
+                let rate_penalty =
+                    if range.min_sample_rate().0 <= target_rate && range.max_sample_rate().0 >= target_rate
+                    {
+                        0
+                    } else {
+                        5
+                    };
+                (mono_penalty + rate_penalty, range.channels())
+            })
+            .expect("non-empty supported_input_configs");
+
+        let rate = target_rate.clamp(best.min_sample_rate().0, best.max_sample_rate().0);
+        Ok(best.with_sample_rate(cpal::SampleRate(rate)))
     }
 
     fn open_input_stream(
@@ -65,7 +77,13 @@ impl AudioCapture {
         let supported = Self::pick_input_config(&device, target_sample_rate)?;
         let sample_format = supported.sample_format();
         let sample_rate = supported.sample_rate().0;
+        let channels = supported.channels();
         let config: StreamConfig = supported.into();
+
+        eprintln!(
+            "audio input: {} Hz, {} channel(s), format {:?}",
+            sample_rate, channels, sample_format
+        );
 
         let samples = Arc::new(Mutex::new(Vec::<f32>::new()));
         let buf = samples.clone();
@@ -78,14 +96,9 @@ impl AudioCapture {
                 device.build_input_stream(
                     &config,
                     move |data: &[f32], _| {
-                        append_samples(&buf, data.iter().copied());
-                        maybe_emit_level(
-                            &buf,
-                            data.len(),
-                            sample_rate,
-                            &level_tx,
-                            &level_counter,
-                        );
+                        let mono = interleaved_to_mono(data.iter().copied(), channels);
+                        append_samples(&buf, mono.iter().copied());
+                        maybe_emit_level(&buf, mono.len(), sample_rate, &level_tx, &level_counter);
                     },
                     stream_error,
                     None,
@@ -97,14 +110,10 @@ impl AudioCapture {
                 device.build_input_stream(
                     &config,
                     move |data: &[i16], _| {
-                        append_samples(&buf, data.iter().map(|s| s.to_sample::<f32>()));
-                        maybe_emit_level(
-                            &buf,
-                            data.len(),
-                            sample_rate,
-                            &level_tx,
-                            &level_counter,
-                        );
+                        let mono =
+                            interleaved_to_mono(data.iter().map(|s| s.to_sample::<f32>()), channels);
+                        append_samples(&buf, mono.iter().copied());
+                        maybe_emit_level(&buf, mono.len(), sample_rate, &level_tx, &level_counter);
                     },
                     stream_error,
                     None,
@@ -116,14 +125,10 @@ impl AudioCapture {
                 device.build_input_stream(
                     &config,
                     move |data: &[u16], _| {
-                        append_samples(&buf, data.iter().map(|s| s.to_sample::<f32>()));
-                        maybe_emit_level(
-                            &buf,
-                            data.len(),
-                            sample_rate,
-                            &level_tx,
-                            &level_counter,
-                        );
+                        let mono =
+                            interleaved_to_mono(data.iter().map(|s| s.to_sample::<f32>()), channels);
+                        append_samples(&buf, mono.iter().copied());
+                        maybe_emit_level(&buf, mono.len(), sample_rate, &level_tx, &level_counter);
                     },
                     stream_error,
                     None,
@@ -150,6 +155,26 @@ impl AudioCapture {
         let mut data = self.samples.lock().expect("audio buffer lock");
         (std::mem::take(&mut *data), self.sample_rate)
     }
+}
+
+/// Average interleaved multi-channel PCM into mono frames for ASR.
+fn interleaved_to_mono<I>(iter: I, channels: u16) -> Vec<f32>
+where
+    I: Iterator<Item = f32>,
+{
+    let ch = channels.max(1) as usize;
+    let samples: Vec<f32> = iter.collect();
+    if ch == 1 {
+        return samples;
+    }
+    let frames = samples.len() / ch;
+    let mut mono = Vec::with_capacity(frames);
+    for i in 0..frames {
+        let base = i * ch;
+        let sum: f32 = (0..ch).map(|c| samples[base + c]).sum();
+        mono.push(sum / ch as f32);
+    }
+    mono
 }
 
 fn should_emit_level(prev_count: usize, batch_len: usize, sample_rate: u32) -> bool {
@@ -196,6 +221,22 @@ mod tests {
         assert!(!should_emit_level(0, 799, 16_000));
         assert!(should_emit_level(0, 800, 16_000));
         assert!(should_emit_level(700, 100, 16_000));
+    }
+
+    #[test]
+    fn interleaved_stereo_downmixes_to_mono() {
+        let stereo = vec![1.0, 0.0, 0.0, 1.0, 0.5, 0.5];
+        let mono = interleaved_to_mono(stereo.into_iter(), 2);
+        assert_eq!(mono, vec![0.5, 0.5, 0.5]);
+    }
+
+    #[test]
+    fn mono_input_is_unchanged() {
+        let samples = vec![0.1, 0.2, 0.3];
+        assert_eq!(
+            interleaved_to_mono(samples.clone().into_iter(), 1),
+            samples
+        );
     }
 
     #[test]

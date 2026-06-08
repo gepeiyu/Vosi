@@ -1,6 +1,6 @@
 use super::microphone_macos::{
     activate_app, is_accessibility_trusted, is_microphone_authorized, microphone_status,
-    open_privacy_settings, prompt_microphone_denied, request_accessibility,
+    open_privacy_settings, prompt_microphone_denied, repair_accessibility,
     request_microphone_permission, MicrophoneStatus,
 };
 use super::status::{PermissionsSnapshot, SetupPhase};
@@ -39,7 +39,7 @@ pub fn snapshot(state: &AppState) -> PermissionsSnapshot {
             action_label: if is_accessibility_trusted() {
                 String::new()
             } else {
-                "去设置".into()
+                "修复权限".into()
             },
         },
     ];
@@ -60,10 +60,12 @@ pub fn snapshot(state: &AppState) -> PermissionsSnapshot {
         permissions,
         reinstall_tip: if all_granted {
             None
-        } else {
+        } else if !is_accessibility_trusted() {
             Some(
-                "若已在系统设置中开启仍无效：关闭再打开 Vosi 开关，或移除后重新添加，然后点击「重新检查权限」。".into(),
+                "辅助功能失效时，点击「修复权限」会自动清除旧授权（需输入 Mac 登录密码），然后打开系统设置重新添加 Vosi。".into(),
             )
+        } else {
+            None
         },
     }
 }
@@ -93,22 +95,11 @@ pub fn open_settings(permission_id: &str) -> Result<(), String> {
                 MicrophoneStatus::Authorized => {}
             }
         }
-        "accessibility" => {
+        "accessibility" | "input_monitoring" => {
             if is_accessibility_trusted() {
                 return Ok(());
             }
-            let _ = request_accessibility();
-            if !is_accessibility_trusted() {
-                open_privacy_settings("Privacy_Accessibility")?;
-            }
-        }
-        "input_monitoring" => {
-            // Legacy id: input monitoring is covered by accessibility on modern macOS.
-            if is_accessibility_trusted() {
-                return Ok(());
-            }
-            let _ = request_accessibility();
-            open_privacy_settings("Privacy_Accessibility")?;
+            let _ = repair_accessibility(true);
         }
         other => return Err(format!("unknown permission: {other}")),
     }
@@ -153,8 +144,8 @@ pub fn run_startup_gate(app: &AppHandle, logger: Arc<Logger>, state: &AppState) 
     }
 
     if !is_accessibility_trusted() {
-        logger.info("requesting accessibility permission");
-        let _ = request_accessibility();
+        logger.info("repairing accessibility permission (reset stale TCC + re-prompt)");
+        let _ = repair_accessibility(true);
         if is_accessibility_trusted() {
             logger.info("accessibility permission granted");
             tray::set_status(app, TrayStatus::Idle);

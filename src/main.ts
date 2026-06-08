@@ -99,7 +99,9 @@ function renderPermissions(snap: PermissionsSnapshot) {
           try {
             await invoke("open_permission_settings", { permissionId: item.id });
             byId<HTMLParagraphElement>("permissions-tip").textContent =
-              "已打开系统设置，请开启权限后返回并点击「重新检查权限」。";
+              item.id === "accessibility"
+                ? "已尝试清除旧授权并打开系统设置。若弹出密码框请输入 Mac 登录密码，然后在辅助功能列表中重新添加 Vosi，再点「重新检查权限」。"
+                : "已打开系统设置，请开启权限后返回并点击「重新检查权限」。";
             byId<HTMLParagraphElement>("permissions-tip").classList.remove("hidden");
           } catch (err) {
             console.error(err);

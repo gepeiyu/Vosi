@@ -152,8 +152,97 @@ bool vosi_activate_app(void) {
     return true;
 }
 
+/// Live probe: NSEvent global monitor only works with a valid Accessibility grant.
+static bool accessibility_live_probe(void) {
+    id monitor = [NSEvent addGlobalMonitorForEventsMatchingMask:NSEventMaskKeyDown
+                                                        handler:^(NSEvent *event) {
+                                                            (void)event;
+                                                        }];
+    if (monitor) {
+        [NSEvent removeMonitor:monitor];
+        return true;
+    }
+    return false;
+}
+
+bool vosi_is_accessibility_live(void) {
+    if (![NSThread isMainThread]) {
+        __block BOOL result = NO;
+        dispatch_sync(dispatch_get_main_queue(), ^{
+            result = vosi_is_accessibility_live();
+        });
+        return result;
+    }
+    return accessibility_live_probe();
+}
+
 bool vosi_is_accessibility_trusted(void) {
-    return AXIsProcessTrusted();
+    return vosi_is_accessibility_live();
+}
+
+static NSString *vosi_bundle_identifier(void) {
+    NSString *bundleId = [[NSBundle mainBundle] bundleIdentifier];
+    if (bundleId.length > 0) {
+        return bundleId;
+    }
+    return @"com.vosi.app";
+}
+
+static bool reset_accessibility_tcc_entry(void) {
+    NSString *bundleId = vosi_bundle_identifier();
+    NSString *script = [NSString stringWithFormat:
+        @"do shell script \"/usr/bin/tccutil reset Accessibility %@\" "
+        @"with administrator privileges",
+        bundleId];
+
+    NSAppleScript *appleScript = [[NSAppleScript alloc] initWithSource:script];
+    if (!appleScript) {
+        return false;
+    }
+
+    NSDictionary *errorInfo = nil;
+    NSAppleEventDescriptor *result = [appleScript executeAndReturnError:&errorInfo];
+    if (errorInfo != nil) {
+        NSLog(@"vosi: tccutil reset failed: %@", errorInfo);
+        return false;
+    }
+    return result != nil;
+}
+
+bool vosi_repair_accessibility(bool reset_tcc) {
+    if (![NSThread isMainThread]) {
+        __block BOOL result = NO;
+        dispatch_sync(dispatch_get_main_queue(), ^{
+            result = vosi_repair_accessibility(reset_tcc);
+        });
+        return result;
+    }
+
+    [NSApp activateIgnoringOtherApps:YES];
+
+    if (vosi_is_accessibility_live()) {
+        return true;
+    }
+
+    if (reset_tcc) {
+        if (!reset_accessibility_tcc_entry()) {
+            NSLog(@"vosi: accessibility TCC reset skipped or failed");
+        }
+    }
+
+    CFStringRef key = CFSTR("AXTrustedCheckOptionPrompt");
+    CFBooleanRef value = kCFBooleanTrue;
+    const void *keys[] = { key };
+    const void *values[] = { value };
+    CFDictionaryRef options = CFDictionaryCreate(
+        kCFAllocatorDefault, keys, values, 1,
+        &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+    AXIsProcessTrustedWithOptions(options);
+    CFRelease(options);
+
+    vosi_open_privacy_settings("Privacy_Accessibility");
+
+    return vosi_is_accessibility_live();
 }
 
 bool vosi_request_accessibility(void) {
@@ -167,18 +256,9 @@ bool vosi_request_accessibility(void) {
 
     [NSApp activateIgnoringOtherApps:YES];
 
-    if (AXIsProcessTrusted()) {
+    if (vosi_is_accessibility_live()) {
         return true;
     }
 
-    CFStringRef key = CFSTR("AXTrustedCheckOptionPrompt");
-    CFBooleanRef value = kCFBooleanTrue;
-    const void *keys[] = { key };
-    const void *values[] = { value };
-    CFDictionaryRef options = CFDictionaryCreate(
-        kCFAllocatorDefault, keys, values, 1,
-        &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
-    bool trusted = AXIsProcessTrustedWithOptions(options);
-    CFRelease(options);
-    return trusted;
+    return vosi_repair_accessibility(true);
 }

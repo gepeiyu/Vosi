@@ -1,7 +1,7 @@
 use crate::asr::engine::{AsrEngine, AsrEngineOptions};
-use crate::asr::punctuation::PunctuationEngine;
 use crate::asr::ModelManager;
 use crate::audio::capture::AudioCapture;
+use crate::audio::level::rms_level;
 use crate::audio::resample::resample_linear;
 use crate::audio::vad::VadEngine;
 use crate::config::AppConfig;
@@ -14,6 +14,8 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 const INFERENCE_TIMEOUT: Duration = Duration::from_secs(5);
+/// Reject near-silent clips that make SenseVoice hallucinate ("Yeah.", "Okay.", etc.).
+const MIN_RECORDING_RMS: f32 = 0.004;
 
 pub enum SessionState {
     Idle,
@@ -22,7 +24,6 @@ pub enum SessionState {
 
 pub struct VoiceSession {
     asr: AsrEngine,
-    punc: Option<PunctuationEngine>,
     hotwords: HotwordReplacer,
     config: AppConfig,
     logger: Arc<Logger>,
@@ -56,17 +57,6 @@ impl VoiceSession {
                 use_itn: config.asr.use_itn,
             },
         )?;
-        let punc = if config.asr.punctuation_enabled {
-            match PunctuationEngine::new(&paths.punc_dir, config.asr.num_threads as i32) {
-                Ok(engine) => Some(engine),
-                Err(e) => {
-                    logger.info(&format!("punctuation engine unavailable: {e}"));
-                    None
-                }
-            }
-        } else {
-            None
-        };
         const BUILTIN_HOTWORDS: &str = include_str!("../../resources/hotwords-tech.txt");
         let hotword_path = expand_tilde(&config.hotword.file);
         let builtin: Vec<&str> = BUILTIN_HOTWORDS
@@ -92,7 +82,6 @@ impl VoiceSession {
 
         Ok(Self {
             asr,
-            punc,
             hotwords,
             config,
             logger,
@@ -147,6 +136,16 @@ impl VoiceSession {
         }
 
         let sample_count = samples.len();
+        let duration_ms = (sample_count as u64 * 1000) / sample_rate as u64;
+        let recording_rms = rms_level(&samples);
+        self.logger.info(&format!(
+            "recording duration_ms={duration_ms} rms={recording_rms:.4}"
+        ));
+        if recording_rms < MIN_RECORDING_RMS {
+            self.logger.info("recording discarded: too quiet");
+            return Ok(None);
+        }
+
         let started = Instant::now();
         let target_rate = self.config.audio.sample_rate;
         let (samples, asr_rate) = if sample_rate != target_rate {
@@ -159,7 +158,6 @@ impl VoiceSession {
         };
         let result = finalize_recording(
             &self.asr,
-            self.punc.as_ref(),
             &self.hotwords,
             &self.config,
             self.vad.as_ref(),
@@ -183,7 +181,6 @@ pub fn join_segments(parts: &[String]) -> String {
 
 fn finalize_recording(
     asr: &AsrEngine,
-    punc: Option<&PunctuationEngine>,
     hotwords: &HotwordReplacer,
     config: &AppConfig,
     vad_engine: Option<&VadEngine>,
@@ -191,9 +188,24 @@ fn finalize_recording(
     sample_rate: u32,
     logger: &Logger,
 ) -> Result<Option<String>, String> {
+    let total_samples = samples.len();
     let segments: Vec<Vec<f32>> = if config.asr.mode == "long" {
         if let Some(vad) = vad_engine {
-            vad.segment(&samples, config.audio.min_speech_ms)
+            let segs = vad.segment(&samples, config.audio.min_speech_ms);
+            let kept: usize = segs.iter().map(|s| s.len()).sum();
+            if segs.is_empty() || kept * 3 < total_samples {
+                logger.info(&format!(
+                    "vad kept {kept}/{total_samples} samples in {} segments — using full clip",
+                    segs.len()
+                ));
+                vec![samples]
+            } else {
+                logger.info(&format!(
+                    "vad segmented {total_samples} samples into {} parts ({kept} kept)",
+                    segs.len()
+                ));
+                segs
+            }
         } else {
             vec![samples]
         }
@@ -220,15 +232,7 @@ fn finalize_recording(
                         return None;
                     }
                     logger.info(&format!("asr raw: {}", truncate_log(&raw, 120)));
-                    let punctuated = match punc {
-                        Some(engine) => engine.punctuate(&raw),
-                        None => raw.clone(),
-                    };
-                    Some(post_process(
-                        &punctuated,
-                        hotwords,
-                        hotword_enabled,
-                    ))
+                    Some(post_process(&raw, hotwords, hotword_enabled))
                 })
                 .collect();
             let _ = tx.send(texts);

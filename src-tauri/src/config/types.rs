@@ -32,8 +32,6 @@ pub struct AsrConfig {
     pub language: String,
     #[serde(default = "default_use_itn")]
     pub use_itn: bool,
-    #[serde(default = "default_punctuation_enabled")]
-    pub punctuation_enabled: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -72,10 +70,6 @@ fn default_use_itn() -> bool {
     true
 }
 
-fn default_punctuation_enabled() -> bool {
-    true
-}
-
 /// macOS: 空格右侧 Command；Windows: 空格右侧 Alt
 pub fn default_trigger_key() -> String {
     if cfg!(target_os = "macos") {
@@ -103,7 +97,6 @@ impl Default for AppConfig {
                 model_variant: "sense-voice-int8".into(),
                 language: default_asr_language(),
                 use_itn: default_use_itn(),
-                punctuation_enabled: default_punctuation_enabled(),
             },
             hotword: HotwordConfig {
                 enabled: true,
@@ -139,7 +132,6 @@ model_variant = "sense-voice-int8"
         let cfg: Wrapper = toml::from_str(&format!("[asr]\n{raw}")).unwrap();
         assert_eq!(cfg.asr.language, "auto");
         assert!(cfg.asr.use_itn);
-        assert!(cfg.asr.punctuation_enabled);
     }
 
     #[test]
@@ -148,6 +140,5 @@ model_variant = "sense-voice-int8"
         assert_eq!(cfg.asr.model_variant, "sense-voice-int8");
         assert_eq!(cfg.asr.language, "auto");
         assert!(cfg.asr.use_itn);
-        assert!(cfg.asr.punctuation_enabled);
     }
 }

@@ -27,6 +27,13 @@ pub fn recheck_permissions(
     app: tauri::AppHandle,
     state: tauri::State<'_, AppState>,
 ) -> PermissionsSnapshot {
+    #[cfg(target_os = "macos")]
+    {
+        use crate::permissions::microphone_macos::{is_accessibility_trusted, repair_accessibility};
+        if !is_accessibility_trusted() {
+            let _ = repair_accessibility(true);
+        }
+    }
     if crate::permissions::all_granted() {
         let _ = crate::try_start_voice_pipeline(&app, state.inner());
     } else if let Some(logger) = state.logger() {

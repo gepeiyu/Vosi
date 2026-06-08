@@ -33,7 +33,6 @@ const MIN_HOLD_MS: u64 = 300;
 
 enum PipelineEvent {
     Hotkey(HotkeyEvent),
-    BeginRecording { press_gen: u64 },
 }
 
 fn begin_recording(
@@ -187,7 +186,6 @@ fn spawn_voice_pipeline(
 
         let mut level_updates_active: Option<Arc<AtomicBool>> = None;
         let mut press_started: Option<Instant> = None;
-        let mut press_gen: u64 = 0;
 
         while let Ok(event) = pipeline_rx.recv() {
             match event {
@@ -196,20 +194,7 @@ fn spawn_voice_pipeline(
                         continue;
                     }
                     logger.info("hotkey pressed");
-                    press_gen += 1;
-                    let my_gen = press_gen;
                     press_started = Some(Instant::now());
-                    let pipeline_tx = pipeline_tx.clone();
-                    thread::spawn(move || {
-                        thread::sleep(Duration::from_millis(MIN_HOLD_MS));
-                        let _ = pipeline_tx.send(PipelineEvent::BeginRecording { press_gen: my_gen });
-                    });
-                }
-                PipelineEvent::BeginRecording { press_gen: gen } => {
-                    if gen != press_gen || press_started.is_none() || session.is_recording() {
-                        continue;
-                    }
-                    logger.info("hotkey hold threshold reached");
                     if begin_recording(
                         &mut session,
                         &app,
@@ -221,35 +206,28 @@ fn spawn_voice_pipeline(
                     .is_err()
                     {
                         press_started = None;
-                        press_gen += 1;
                     }
                 }
                 PipelineEvent::Hotkey(HotkeyEvent::Released) => {
-                    press_gen += 1;
-
                     let held_ms = press_started
                         .take()
                         .map(|t| t.elapsed().as_millis())
                         .unwrap_or(0);
 
+                    if held_ms < MIN_HOLD_MS as u128 {
+                        if session.is_recording() {
+                            session.cancel_recording();
+                            stop_level_updates(&mut level_updates_active);
+                            overlay.emit(OverlayState::Hidden);
+                            tray::set_status(&app, TrayStatus::Idle);
+                        }
+                        logger.info("hotkey tap ignored");
+                        continue;
+                    }
+
                     if !session.is_recording() {
-                        if held_ms < MIN_HOLD_MS as u128 {
-                            logger.info("hotkey tap ignored");
-                            continue;
-                        }
-                        logger.info("hotkey hold threshold reached on release");
-                        if begin_recording(
-                            &mut session,
-                            &app,
-                            &overlay,
-                            &mut level_updates_active,
-                            &logger,
-                            &notifier,
-                        )
-                        .is_err()
-                        {
-                            continue;
-                        }
+                        logger.info("hotkey released without active recording");
+                        continue;
                     }
 
                     stop_level_updates(&mut level_updates_active);
@@ -268,7 +246,7 @@ fn spawn_voice_pipeline(
                                     && !crate::permissions::is_accessibility_trusted()
                                 {
                                     notifier.error(
-                                        "文本注入失败：请重新授权辅助功能（关闭后重新打开 Vosi 开关）",
+                                        "文本注入失败：请在设置页点击「修复权限」重新授权辅助功能",
                                     );
                                 } else {
                                     notifier.error("已复制到剪贴板，请手动粘贴");
