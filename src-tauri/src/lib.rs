@@ -14,6 +14,8 @@ pub mod post;
 
 use app::state::AppState;
 use app::tray::{self, TrayStatus};
+use asr::ModelManager;
+use permissions::SetupPhase;
 use config::AppConfig;
 use hotkey::listener::{self, HotkeyEvent};
 use inject::{default_injector, inject_with_fallback, method_from_config};
@@ -77,7 +79,7 @@ fn stop_level_updates(level_updates_active: &mut Option<Arc<AtomicBool>>) {
     }
 }
 use tauri::menu::{Menu, MenuItem};
-use tauri::Manager;
+use tauri::{Emitter, Manager, WindowEvent};
 
 fn models_data_dir() -> PathBuf {
     dirs::data_dir()
@@ -89,9 +91,7 @@ fn dev_models_dir() -> Option<PathBuf> {
     #[cfg(debug_assertions)]
     {
         let dev = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../models/dev");
-        if crate::asr::ModelManager::sense_voice_ready(&dev)
-            || crate::asr::ModelManager::paraformer_ready(&dev)
-        {
+        if crate::asr::ModelManager::sense_voice_ready(&dev) {
             return Some(dev);
         }
     }
@@ -127,10 +127,40 @@ fn spawn_voice_pipeline(
 
     let inject_method = method_from_config(&config.inject.method);
     thread::spawn(move || {
+        let state = app.state::<AppState>();
+        let models_root = models_data_dir();
+        let mgr = ModelManager::new(models_root.clone());
+
+        if ModelManager::needs_install(&models_root, &bundled) {
+            state.set_setup(
+                SetupPhase::InstallingModels,
+                Some("正在安装语音模型，首次启动约需 1–2 分钟…".into()),
+            );
+            let _ = app.emit("setup-updated", ());
+            logger.info("installing bundled speech models");
+            tray::set_status(&app, TrayStatus::Warning);
+            if let Err(err) = mgr.ensure_installed(&bundled, dev_models.as_deref()) {
+                let msg = format!("语音模型安装失败: {err}");
+                logger.error(&msg);
+                state.set_setup(SetupPhase::Error, Some(msg));
+                state.clear_pipeline_spawned();
+                let _ = app.emit("setup-updated", ());
+                notifier.error("语音引擎不可用，请重新安装");
+                return;
+            }
+            logger.info("speech models installed");
+        }
+
+        state.set_setup(
+            SetupPhase::LoadingEngine,
+            Some("正在加载语音引擎…".into()),
+        );
+        let _ = app.emit("setup-updated", ());
+
         let injector = default_injector();
         let mut session = match VoiceSession::try_new(
             config,
-            models_data_dir(),
+            models_root,
             &bundled,
             dev_models.as_deref(),
             logger.clone(),
@@ -138,11 +168,22 @@ fn spawn_voice_pipeline(
             Ok(session) => session,
             Err(err) => {
                 logger.error(&format!("voice pipeline unavailable: {err}"));
+                state.set_setup(
+                    SetupPhase::Error,
+                    Some("语音引擎加载失败，请重新安装".into()),
+                );
+                state.clear_pipeline_spawned();
+                let _ = app.emit("setup-updated", ());
                 notifier.error("语音引擎不可用，请重新安装");
                 tray::set_status(&app, TrayStatus::Warning);
                 return;
             }
         };
+
+        state.mark_pipeline_started();
+        let _ = app.emit("setup-updated", ());
+        tray::set_status(&app, TrayStatus::Idle);
+        logger.info("voice pipeline ready");
 
         let mut level_updates_active: Option<Arc<AtomicBool>> = None;
         let mut press_started: Option<Instant> = None;
@@ -274,6 +315,9 @@ pub fn try_start_voice_pipeline(app: &tauri::AppHandle, state: &AppState) -> boo
     if state.voice_ready() {
         return true;
     }
+    if state.pipeline_spawned() {
+        return false;
+    }
     if !permissions::all_granted() {
         return false;
     }
@@ -283,6 +327,20 @@ pub fn try_start_voice_pipeline(app: &tauri::AppHandle, state: &AppState) -> boo
     let Some(bundled) = state.bundled() else {
         return false;
     };
+    if ModelManager::needs_install(&models_data_dir(), &bundled) {
+        state.set_setup(
+            SetupPhase::InstallingModels,
+            Some("正在安装语音模型，首次启动约需 1–2 分钟…".into()),
+        );
+        tray::show_settings_window(app);
+        tray::set_status(app, TrayStatus::Warning);
+    } else {
+        state.set_setup(
+            SetupPhase::LoadingEngine,
+            Some("正在加载语音引擎…".into()),
+        );
+    }
+    state.mark_pipeline_spawned();
     let config = state.get_config();
     let overlay = OverlayController::new(app.clone(), config.overlay.enabled);
     let notifier = Notifier::new(app.clone());
@@ -295,8 +353,6 @@ pub fn try_start_voice_pipeline(app: &tauri::AppHandle, state: &AppState) -> boo
         overlay,
         notifier,
     );
-    state.mark_pipeline_started();
-    tray::set_status(app, TrayStatus::Idle);
     true
 }
 
@@ -329,13 +385,24 @@ pub fn run() {
                 bundled,
                 dev_models_dir(),
             );
-            let ready = permissions::run_startup_gate(app.handle(), logger.clone());
+            let app_state = app.state::<AppState>().inner();
+            let ready = permissions::run_startup_gate(app.handle(), logger.clone(), app_state);
             if ready {
-                try_start_voice_pipeline(app.handle(), app.state::<AppState>().inner());
+                try_start_voice_pipeline(app.handle(), app_state);
             } else {
+                app_state.set_setup(SetupPhase::WaitingPermissions, None);
                 logger.info("voice pipeline waiting for permissions");
             }
             Ok(())
+        })
+        .on_window_event(|window, event| {
+            if window.label() != "main" {
+                return;
+            }
+            if let WindowEvent::CloseRequested { api, .. } = event {
+                api.prevent_close();
+                tray::on_settings_close_requested(window);
+            }
         })
         .on_menu_event(|app, event| {
             let id = event.id().0.as_str();

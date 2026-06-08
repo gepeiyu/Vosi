@@ -5,7 +5,7 @@ mod macos;
 #[cfg(target_os = "macos")]
 pub(crate) mod microphone_macos;
 
-pub use status::{PermissionState, PermissionsSnapshot};
+pub use status::{PermissionState, PermissionsSnapshot, SetupPhase};
 
 pub use platform::{all_granted, open_settings, run_startup_gate, snapshot};
 
@@ -25,6 +25,7 @@ mod platform {
 #[cfg(not(target_os = "macos"))]
 mod platform {
     use super::status::PermissionsSnapshot;
+    use crate::app::state::AppState;
     use crate::audio::capture::AudioCapture;
     use crate::log::Logger;
     use std::sync::Arc;
@@ -34,15 +35,15 @@ mod platform {
         true
     }
 
-    pub fn snapshot(voice_ready: bool) -> PermissionsSnapshot {
-        PermissionsSnapshot::all_granted(voice_ready)
+    pub fn snapshot(state: &AppState) -> PermissionsSnapshot {
+        PermissionsSnapshot::all_granted(state.voice_ready())
     }
 
     pub fn open_settings(_permission_id: &str) -> Result<(), String> {
         Ok(())
     }
 
-    pub fn run_startup_gate(_app: &AppHandle, logger: Arc<Logger>) -> bool {
+    pub fn run_startup_gate(_app: &AppHandle, logger: Arc<Logger>, _state: &AppState) -> bool {
         match AudioCapture::preflight_microphone() {
             Ok(()) => logger.info("microphone permission preflight ok"),
             Err(err) => logger.info(&format!("microphone preflight skipped: {err}")),

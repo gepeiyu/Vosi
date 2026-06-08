@@ -42,16 +42,14 @@ impl VoiceSession {
         let paths = mgr
             .ensure_installed(bundled, dev_models)
             .map_err(|e| e.to_string())?;
-        let (asr_dir, is_legacy) = ModelManager::active_asr_dir(&paths);
-        if is_legacy {
-            logger.info("sense-voice model not found; legacy paraformer fallback not supported");
+        if !ModelManager::sense_voice_ready(&mgr.models_dir()) {
             return Err(
                 "sense-voice model not found — run ./scripts/download-models.sh to install"
                     .into(),
             );
         }
         let asr = AsrEngine::new(
-            &asr_dir,
+            &paths.sense_voice_dir,
             config.asr.num_threads as i32,
             AsrEngineOptions {
                 language: config.asr.language.clone(),

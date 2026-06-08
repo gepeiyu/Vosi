@@ -130,7 +130,7 @@ mod tests {
         let raw = r#"
 num_threads = 2
 mode = "short"
-model_variant = "paraformer-large-int8"
+model_variant = "sense-voice-int8"
 "#;
         #[derive(serde::Deserialize)]
         struct Wrapper {

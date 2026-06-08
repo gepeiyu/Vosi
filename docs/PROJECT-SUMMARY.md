@@ -1,6 +1,6 @@
 # Vosi 项目总结
 
-> 最后更新：2026-06-07  
+> 最后更新：2026-06-08  
 > 仓库：https://github.com/gepeiyu/Vosi  
 > 许可证：Apache-2.0
 
@@ -14,7 +14,7 @@
 
 - **按住热键** → 说话 → **松手** → 识别文字注入当前焦点应用
 - 100% 离线，用户侧零 Python 依赖
-- 推理：FunASR Paraformer + 标点 + ITN，经 [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) Rust crate 1.13.x
+- 推理：FunASR **SenseVoice** INT8（多语 `language=auto`）+ 可选 CT-Transformer 标点 + ITN，经 [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) Rust crate 1.13.x
 - 壳层：Tauri 2 + Rust 后端 + Vite/TS 设置界面
 
 ---
@@ -25,8 +25,9 @@
 |----|------|
 | GitHub | https://github.com/gepeiyu/Vosi |
 | 首个公开 Release | [v0.1.0](https://github.com/gepeiyu/Vosi/releases/tag/v0.1.0)（2026-06-06，源码发布） |
-| 当前开发分支 | `feat/v0.1.1-polish`（含品牌、浮窗、CGEventTap 热键、Release CI 等） |
-| 版本号（代码内） | `0.1.0`（`tauri.conf.json` / `Cargo.toml`；v0.1.1 发版前需 bump） |
+| 当前开发分支 | `feat/v0.1.1-polish`（polish + SenseVoice 升级） |
+| **应用版本号** | **`0.1.0`**（`tauri.conf.json` / `Cargo.toml` / `package.json`） |
+| **本地打包产物** | `Vosi_0.1.0_x64.dmg`（须与版本号一致；发新版前 bump 并全量 `npm run tauri build`） |
 
 ### 里程碑
 
@@ -36,6 +37,7 @@
 | 2026-06-06 | 模型下载链路、ASR 集成测试、macOS E2E 语音输入验证 |
 | 2026-06-06 | 推送 `main`、打 tag `v0.1.0`、GitHub 正式开源 |
 | 2026-06-06–07 | v0.1.1 polish：热键修复、浮窗、品牌图标、三平台 Release workflow |
+| 2026-06-07–08 | SenseVoice INT8 升级、权限引导、Task 10 清理 legacy paraformer；人工验收通过 |
 
 ---
 
@@ -46,7 +48,7 @@
     → hotkey/（macOS: CGEventTap；Windows: 全局监听）
     → audio/capture（cpal 录音）
     → [长句模式] audio/vad（Silero 分段）
-    → asr/engine（Paraformer 离线识别）
+    → asr/engine（SenseVoice 离线识别）
     → asr/punctuation（CT-Transformer 标点）
     → post/（热词替换 → ITN）
     → inject/（enigo 键盘模拟 / arboard 剪贴板）
@@ -72,7 +74,7 @@
 - macOS 12+ 或 Windows 10+
 - Node.js 20+
 - Rust stable
-- 磁盘：模型约 **360 MB**（ASR 78MB + 标点 281MB + VAD 2MB）
+- 磁盘：模型约 **510 MB**（ASR 228MB + 标点 281MB + VAD 2MB）
 - 首次编译：sherpa-onnx 静态库约 18MB（缓存于 `SHERPA_ONNX_ARCHIVE_DIR`）
 
 ---
@@ -143,7 +145,7 @@ Debug 构建会自动将 `models/dev/` 复制到用户数据目录（若 bundled
 export SHERPA_ONNX_ARCHIVE_DIR="$PWD/.cache/sherpa-onnx"
 cd src-tauri
 
-cargo test --lib                                    # 11 项单元测试
+cargo test --lib                                    # 单元测试（含 ModelManager）
 cargo test --test asr_pipeline -- --ignored         # ASR 管线（需 models/dev）
 cargo test --test asr_golden -- --ignored           # Golden 音频（需 fixture）
 ```
@@ -236,9 +238,11 @@ npm run tauri build
 |----|------|
 | 魔搭 ONNX 不兼容 | 须用 sherpa 预打包模型（见 §5） |
 | macOS 浮窗焦点 | 录音浮窗可能短暂激活 Vosi，原输入框或失焦（后续 NSPanel 优化） |
-| Paraformer 无 runtime 热词 | 采用后处理文本替换 |
+| SenseVoice 无 runtime 热词 | 采用后处理文本替换 + 内置技术热词包 |
+| Golden 15 条 WAV | 基础设施就绪，音频待 TTS/录制（不阻塞发版） |
+| 标点对比 | 暂缓；当前默认保留 CT-Transformer 标点 |
 | 开机自启 | UI 有选项，平台注册未实现 → [follow-ups/2026-06-06-start-on-boot-platform-registration.md](follow-ups/2026-06-06-start-on-boot-platform-registration.md) |
-| 模型不入 Git | `models/dev/`、`models/bundled/` 约 400MB，需本地或 CI 下载 |
+| 模型不入 Git | `models/dev/`、`src-tauri/models/bundled/` 约 510MB，构建前脚本下载 |
 
 ---
 
@@ -252,6 +256,9 @@ npm run tauri build
 | macOS E2E 按住说话 + 文本注入 | 2026-06-06 | 用户确认正常 |
 | GitHub 推送 + v0.1.0 Release | 2026-06-06 | 完成 |
 | CI clippy + tests（polish 分支） | 2026-06-07 | PASS |
+| SenseVoice 升级 + `cargo test --lib` | 2026-06-08 | 24/24 PASS |
+| macOS E2E SenseVoice dictation | 2026-06-08 | 用户确认正常 |
+| 本地 Release DMG `Vosi_0.1.0_x64.dmg` | 2026-06-08 | 已构建（含 sense-voice + 标点 + VAD） |
 
 ---
 
@@ -270,6 +277,8 @@ npm run tauri build
 | [logs/2026-06-05-vosi-v01-execution-log.md](logs/2026-06-05-vosi-v01-execution-log.md) | v0.1 执行日志 |
 | [logs/2026-06-06-vosi-v01-polish-execution-log.md](logs/2026-06-06-vosi-v01-polish-execution-log.md) | polish 执行日志 |
 | [logs/2026-06-07-v01-polish-wrap-up.md](logs/2026-06-07-v01-polish-wrap-up.md) | v0.1.1 收尾（品牌/打包/Release） |
+| [specs/2026-06-07-vosi-model-upgrade-design.md](specs/2026-06-07-vosi-model-upgrade-design.md) | SenseVoice 升级设计 |
+| [logs/2026-06-07-sensevoice-model-upgrade-execution-log.md](logs/2026-06-07-sensevoice-model-upgrade-execution-log.md) | SenseVoice 升级执行日志 |
 | [follow-ups/2026-06-06-start-on-boot-platform-registration.md](follow-ups/2026-06-06-start-on-boot-platform-registration.md) | 开机自启待办 |
 
 ---

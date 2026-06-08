@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 
 type AppConfig = {
   hotkey: { trigger_key: string; mode: string };
@@ -14,9 +15,18 @@ type AppConfig = {
   overlay: { enabled: boolean };
 };
 
+type SetupPhase =
+  | "waiting_permissions"
+  | "installing_models"
+  | "loading_engine"
+  | "ready"
+  | "error";
+
 type PermissionsSnapshot = {
   all_granted: boolean;
   voice_ready: boolean;
+  setup_phase: SetupPhase;
+  setup_message: string | null;
   permissions: Array<{
     id: string;
     label: string;
@@ -33,14 +43,31 @@ function byId<T extends HTMLElement>(id: string): T {
   return el as T;
 }
 
+function voiceStatusText(snap: PermissionsSnapshot): string {
+  if (snap.voice_ready) {
+    return "语音功能：就绪";
+  }
+  if (!snap.all_granted) {
+    return "语音功能：未就绪（请先开启下方全部权限）";
+  }
+  switch (snap.setup_phase) {
+    case "installing_models":
+      return snap.setup_message ?? "语音功能：正在安装语音模型…";
+    case "loading_engine":
+      return snap.setup_message ?? "语音功能：正在加载语音引擎…";
+    case "error":
+      return snap.setup_message ?? "语音功能：安装失败，请重新安装";
+    default:
+      return "语音功能：启动中…";
+  }
+}
+
 function renderPermissions(snap: PermissionsSnapshot) {
   const voiceStatus = byId<HTMLParagraphElement>("voice-ready-status");
-  voiceStatus.textContent = snap.voice_ready
-    ? "语音功能：就绪"
-    : snap.all_granted
-      ? "语音功能：启动中…"
-      : "语音功能：未就绪（请先开启下方全部权限）";
-  voiceStatus.className = `voice-ready-status${snap.voice_ready ? " is-ready" : " is-blocked"}`;
+  voiceStatus.textContent = voiceStatusText(snap);
+  voiceStatus.className = `voice-ready-status${
+    snap.voice_ready ? " is-ready" : snap.setup_phase === "error" ? " is-error" : " is-blocked"
+  }`;
 
   const list = byId<HTMLUListElement>("permissions-list");
   list.replaceChildren(
@@ -182,6 +209,22 @@ async function loadSettings() {
 window.addEventListener("DOMContentLoaded", () => {
   loadPermissions().catch(console.error);
   loadSettings().catch(console.error);
+
+  listen("setup-updated", () => {
+    loadPermissions().catch(console.error);
+  }).catch(console.error);
+
+  window.setInterval(() => {
+    if (document.visibilityState === "visible") {
+      invoke<PermissionsSnapshot>("get_permissions_status")
+        .then((snap) => {
+          if (!snap.voice_ready) {
+            renderPermissions(snap);
+          }
+        })
+        .catch(console.error);
+    }
+  }, 2000);
 
   byId<HTMLButtonElement>("recheck-permissions").addEventListener("click", async () => {
     const btn = byId<HTMLButtonElement>("recheck-permissions");

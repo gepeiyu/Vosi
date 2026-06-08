@@ -4,7 +4,6 @@ use std::path::{Path, PathBuf};
 #[derive(Debug, Clone)]
 pub struct ModelPaths {
     pub sense_voice_dir: PathBuf,
-    pub paraformer_dir: PathBuf,
     pub vad_model: PathBuf,
     pub punc_dir: PathBuf,
 }
@@ -26,7 +25,6 @@ impl ModelManager {
         let base = self.models_dir();
         ModelPaths {
             sense_voice_dir: base.join("sense-voice"),
-            paraformer_dir: base.join("paraformer-zh"),
             vad_model: base.join("vad/model.onnx"),
             punc_dir: base.join("punctuation"),
         }
@@ -49,30 +47,10 @@ impl ModelManager {
         has_model && dir.join("tokens.txt").exists()
     }
 
-    pub fn paraformer_ready(base: &Path) -> bool {
-        let dir = base.join("paraformer-zh");
-        ["model.int8.onnx", "model.onnx", "model_quant.onnx"]
-            .iter()
-            .any(|name| dir.join(name).exists())
-    }
-
-    pub fn active_asr_dir(paths: &ModelPaths) -> (PathBuf, bool) {
-        let sv = &paths.sense_voice_dir;
-        let sv_ready = ["model.int8.onnx", "model.onnx"]
-            .iter()
-            .any(|n| sv.join(n).exists())
-            && sv.join("tokens.txt").exists();
-        if sv_ready {
-            return (sv.clone(), false);
-        }
-        let pf = &paths.paraformer_dir;
-        let pf_ready = ["model.int8.onnx", "model.onnx", "model_quant.onnx"]
-            .iter()
-            .any(|n| pf.join(n).exists());
-        if pf_ready {
-            return (pf.clone(), true);
-        }
-        (sv.clone(), false)
+    /// True when Application Support is missing sense-voice but the bundle can supply it.
+    pub fn needs_install(models_root: &Path, bundled: &Path) -> bool {
+        let dest = models_root.join("models");
+        !Self::sense_voice_ready(&dest) && Self::sense_voice_ready(bundled)
     }
 
     pub fn ensure_installed(
@@ -81,17 +59,42 @@ impl ModelManager {
         dev_fallback: Option<&Path>,
     ) -> std::io::Result<ModelPaths> {
         let dest = self.models_dir();
-        if !Self::sense_voice_ready(&dest) && !Self::paraformer_ready(&dest) {
-            std::fs::create_dir_all(&dest)?;
+        std::fs::create_dir_all(&dest)?;
+
+        if !Self::sense_voice_ready(&dest) {
+            if Self::sense_voice_ready(bundled) {
+                copy_dir_all(&bundled.join("sense-voice"), &dest.join("sense-voice"))?;
+            } else if let Some(dev) = dev_fallback {
+                if Self::sense_voice_ready(dev) {
+                    copy_dir_all(&dev.join("sense-voice"), &dest.join("sense-voice"))?;
+                }
+            }
+        }
+
+        if !dest.join("vad/model.onnx").exists() && bundled.join("vad/model.onnx").exists() {
+            copy_dir_all(&bundled.join("vad"), &dest.join("vad"))?;
+        }
+
+        if !Self::sense_voice_ready(&dest) {
             copy_dir_all(bundled, &dest)?;
-            if !Self::sense_voice_ready(&dest) && !Self::paraformer_ready(&dest) {
+            if !Self::sense_voice_ready(&dest) {
                 if let Some(dev) = dev_fallback {
                     copy_dir_all(dev, &dest)?;
                 }
             }
         }
+
+        remove_legacy_paraformer(&dest)?;
         Ok(self.resolve_paths())
     }
+}
+
+fn remove_legacy_paraformer(dest: &Path) -> std::io::Result<()> {
+    let legacy = dest.join("paraformer-zh");
+    if legacy.exists() {
+        std::fs::remove_dir_all(&legacy)?;
+    }
+    Ok(())
 }
 
 fn copy_dir_all(src: &Path, dst: &Path) -> std::io::Result<()> {
@@ -132,25 +135,27 @@ mod tests {
         let mgr = ModelManager::new(PathBuf::from("/tmp/vosi"));
         let paths = mgr.resolve_paths();
         assert!(paths.sense_voice_dir.ends_with("sense-voice"));
-        assert!(paths.paraformer_dir.ends_with("paraformer-zh"));
         assert!(paths.vad_model.ends_with("vad/model.onnx"));
     }
 
     #[test]
-    fn active_asr_dir_prefers_sense_voice() {
-        let dir = tempfile::tempdir().unwrap();
-        let sv = dir.path().join("sense-voice");
+    fn ensure_installed_copies_sense_voice_and_removes_legacy_paraformer() {
+        let bundled = tempfile::tempdir().unwrap();
+        let sv = bundled.path().join("sense-voice");
         std::fs::create_dir_all(&sv).unwrap();
         std::fs::write(sv.join("model.int8.onnx"), b"x").unwrap();
         std::fs::write(sv.join("tokens.txt"), b"t").unwrap();
-        let paths = ModelPaths {
-            sense_voice_dir: sv,
-            paraformer_dir: dir.path().join("paraformer-zh"),
-            vad_model: dir.path().join("vad/model.onnx"),
-            punc_dir: dir.path().join("punctuation"),
-        };
-        let (active, legacy) = ModelManager::active_asr_dir(&paths);
-        assert!(!legacy);
-        assert!(active.ends_with("sense-voice"));
+
+        let dest_root = tempfile::tempdir().unwrap();
+        let pf = dest_root.path().join("models/paraformer-zh");
+        std::fs::create_dir_all(&pf).unwrap();
+        std::fs::write(pf.join("model.int8.onnx"), b"old").unwrap();
+
+        let mgr = ModelManager::new(dest_root.path().to_path_buf());
+        mgr.ensure_installed(bundled.path(), None).unwrap();
+
+        let models = dest_root.path().join("models");
+        assert!(ModelManager::sense_voice_ready(&models));
+        assert!(!models.join("paraformer-zh").exists());
     }
 }

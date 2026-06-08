@@ -54,6 +54,11 @@ body {
   color: #856404;
 }
 
+.voice-ready-status.is-error {
+  background: #f8d7da;
+  color: #721c24;
+}
+
 .permissions-list {
   list-style: none;
   margin: 0 0 12px;

@@ -3,7 +3,8 @@ use super::microphone_macos::{
     open_privacy_settings, prompt_microphone_denied, request_accessibility,
     request_microphone_permission, MicrophoneStatus,
 };
-use super::status::PermissionsSnapshot;
+use super::status::{PermissionsSnapshot, SetupPhase};
+use crate::app::state::AppState;
 use crate::app::tray::{self, TrayStatus};
 use crate::log::Logger;
 use std::sync::Arc;
@@ -13,7 +14,8 @@ pub fn all_granted() -> bool {
     is_microphone_authorized() && is_accessibility_trusted()
 }
 
-pub fn snapshot(voice_ready: bool) -> PermissionsSnapshot {
+pub fn snapshot(state: &AppState) -> PermissionsSnapshot {
+    let voice_ready = state.voice_ready();
     let mic_status = microphone_status();
     let permissions = vec![
         super::status::PermissionState {
@@ -42,9 +44,19 @@ pub fn snapshot(voice_ready: bool) -> PermissionsSnapshot {
         },
     ];
     let all_granted = permissions.iter().all(|p| p.granted);
+    let (setup_phase, setup_message) = if voice_ready {
+        (SetupPhase::Ready, None)
+    } else if !all_granted {
+        (SetupPhase::WaitingPermissions, None)
+    } else {
+        (state.setup_phase(), state.setup_message())
+    };
+
     PermissionsSnapshot {
         all_granted,
         voice_ready,
+        setup_phase,
+        setup_message,
         permissions,
         reinstall_tip: if all_granted {
             None
@@ -56,8 +68,8 @@ pub fn snapshot(voice_ready: bool) -> PermissionsSnapshot {
     }
 }
 
-fn log_permissions(logger: &Logger) {
-    let snap = snapshot(false);
+fn log_permissions(logger: &Logger, state: &AppState) {
+    let snap = snapshot(state);
     for item in &snap.permissions {
         let state = if item.granted { "ok" } else { "missing" };
         logger.info(&format!("permission {}: {state}", item.id));
@@ -106,8 +118,8 @@ pub fn open_settings(permission_id: &str) -> Result<(), String> {
 /// Run on the main thread during startup.
 /// Returns true when all permissions are granted and the app may start.
 /// Returns false when permissions are incomplete.
-pub fn run_startup_gate(app: &AppHandle, logger: Arc<Logger>) -> bool {
-    log_permissions(&logger);
+pub fn run_startup_gate(app: &AppHandle, logger: Arc<Logger>, state: &AppState) -> bool {
+    log_permissions(&logger, state);
 
     if all_granted() {
         logger.info("permissions ready");

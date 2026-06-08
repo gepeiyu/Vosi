@@ -1,6 +1,6 @@
 # Vosi v0.1.1 收尾总结
 
-> 日期：2026-06-07 | 分支：`feat/v0.1.1-polish` | 收尾 commit：`21a8458`
+> 日期：2026-06-08（更新） | 分支：`feat/v0.1.1-polish`
 
 本文档汇总 v0.1.1 polish 阶段的功能修复、品牌资源、打包发布与开发运维信息，供后续维护与发版参考。
 
@@ -10,11 +10,14 @@
 
 | 项 | 状态 |
 |----|------|
-| 功能开发 | v0.1.1 polish 基本完成 |
+| 功能开发 | v0.1.1 polish + SenseVoice 升级已完成 |
 | CI | `main` / PR 上 macOS clippy + unit tests 已通过 |
 | PR | [#1](https://github.com/gepeiyu/Vosi/pull/1)（`feat/v0.1.1-polish` → `main`） |
-| 版本号 | 仍为 `0.1.0`（`tauri.conf.json` / `Cargo.toml` / `package.json` 尚未 bump 到 0.1.1） |
-| 本地 commit | `21a8458` — branding、hold-to-talk、bundle、release CI |
+| **应用版本号** | **`0.1.0`**（`tauri.conf.json` / `Cargo.toml` / `package.json`） |
+| **本地 DMG** | `src-tauri/target/release/bundle/dmg/Vosi_0.1.0_x64.dmg`（2026-06-08，Intel macOS） |
+| 版本对应原则 | 安装包文件名 `Vosi_<version>_*.dmg` 须与 `tauri.conf.json` 的 `version` 一致；改版本后须全量 `npm run tauri build`（`--bundles app` 不更新 DMG） |
+| ASR 模型 | SenseVoice INT8（`sense-voice/`）；已移除 legacy `paraformer-zh/` |
+| 打包体积 | 含标点约 **~510MB**（sense-voice 228MB + punctuation 281MB + VAD） |
 | GitHub Release | 打 `v*` tag 后由 `.github/workflows/release.yml` 自动构建并发布 |
 
 ---
@@ -103,7 +106,7 @@ export SHERPA_ONNX_ARCHIVE_DIR="$PWD/.cache/sherpa-onnx"
 npm run tauri build
 ```
 
-- **`models/dev/`** 与 **`src-tauri/models/bundled/`** 均在 `.gitignore` 或不应提交（约 400 MB）；CI Release 在构建前执行上述脚本。
+- **`models/dev/`** 与 **`src-tauri/models/bundled/*`** 不入 Git（约 510 MB）；构建前本地或 CI 执行上述脚本。
 - 用户数据目录安装副本：`~/Library/Application Support/vosi/models/`（macOS）。
 
 ---
@@ -170,18 +173,29 @@ npm run tauri dev
 
 ---
 
-## 7. 后续待办
+## 7. SenseVoice 升级（2026-06-07–08）
+
+- 规格：`docs/specs/2026-06-07-vosi-model-upgrade-design.md`
+- 执行日志：`docs/logs/2026-06-07-sensevoice-model-upgrade-execution-log.md`
+- 默认 ASR：`language=auto`、`use_itn=true`、`punctuation_enabled=true`
+- Task 10 已清理 paraformer legacy；标点管线保留
+- Golden 15 条 WAV / 标点对比：**暂缓**（不阻塞当前版本）
+
+---
+
+## 8. 后续待办
 
 | 项 | 文档 |
 |----|------|
 | 开机自启平台注册 | `docs/follow-ups/2026-06-06-start-on-boot-platform-registration.md` |
-| 启动时权限引导 / 非激活浮窗 | 本文 §2.3，尚未实现 |
-| bump 至 v0.1.1 + 打 tag 发 Release | 本文 §5 |
+| 非激活浮窗（NSPanel） | 本文 §2.3 |
+| bump 版本号 + 打 tag 发 GitHub Release | 本文 §5（当前仍为 0.1.0） |
 | merge PR #1 | GitHub |
+| Golden WAV + 标点对比（可选） | `tests/fixtures/audio/README.md` |
 
 ---
 
-## 8. 关键文件索引
+## 9. 关键文件索引
 
 ```
 src-tauri/src/lib.rs              # 300ms hold-to-talk 管线
@@ -198,7 +212,7 @@ scripts/prepare-bundle-models.sh  # Release 模型复制
 
 ---
 
-## 9. 相关文档
+## 10. 相关文档
 
 - 设计规格：`docs/specs/2026-06-06-vosi-v01-polish-design.md`
 - 实施计划：`docs/plans/2026-06-06-vosi-v01-polish.md`

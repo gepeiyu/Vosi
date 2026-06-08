@@ -14,7 +14,7 @@ pub fn save_config(state: tauri::State<'_, AppState>, cfg: AppConfig) -> Result<
 
 #[tauri::command]
 pub fn get_permissions_status(state: tauri::State<'_, AppState>) -> PermissionsSnapshot {
-    crate::permissions::snapshot(state.voice_ready())
+    crate::permissions::snapshot(state.inner())
 }
 
 #[tauri::command]
@@ -32,5 +32,5 @@ pub fn recheck_permissions(
     } else if let Some(logger) = state.logger() {
         logger.info("recheck: permissions still incomplete");
     }
-    crate::permissions::snapshot(state.voice_ready())
+    crate::permissions::snapshot(state.inner())
 }

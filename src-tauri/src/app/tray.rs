@@ -1,5 +1,8 @@
 use tauri::image::Image;
-use tauri::{include_image, ActivationPolicy, AppHandle, Manager, Runtime};
+use tauri::{include_image, ActivationPolicy, AppHandle, Manager, Runtime, WebviewWindow, Window};
+
+#[cfg(target_os = "macos")]
+use crate::permissions::microphone_macos::activate_app;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TrayStatus {
@@ -55,6 +58,8 @@ fn hide_windows_from_taskbar<R: Runtime>(app: &AppHandle<R>) {
 pub fn show_settings_window<R: Runtime>(app: &AppHandle<R>) {
     #[cfg(target_os = "macos")]
     {
+        let _ = app.set_activation_policy(ActivationPolicy::Regular);
+        activate_app();
         let _ = app.show();
     }
 
@@ -63,15 +68,30 @@ pub fn show_settings_window<R: Runtime>(app: &AppHandle<R>) {
         return;
     };
 
+    show_settings_webview(&window);
+}
+
+pub fn show_settings_webview<R: Runtime>(window: &WebviewWindow<R>) {
     #[cfg(windows)]
     {
         let _ = window.set_skip_taskbar(true);
     }
 
     let _ = window.unminimize();
+    let _ = window.center();
     if let Err(err) = window.show() {
         eprintln!("settings window show failed: {err}");
         return;
     }
     let _ = window.set_focus();
+}
+
+/// Keep the settings window alive; hide instead of destroy (macOS tray apps).
+pub fn on_settings_close_requested<R: Runtime>(window: &Window<R>) {
+    let _ = window.hide();
+    #[cfg(target_os = "macos")]
+    {
+        let app = window.app_handle();
+        let _ = app.set_activation_policy(ActivationPolicy::Accessory);
+    }
 }

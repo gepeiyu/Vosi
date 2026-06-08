@@ -13,7 +13,7 @@ git clone https://github.com/gepeiyu/Vosi.git
 cd Vosi
 npm install
 
-# 下载 ASR 模型（约 360 MB，仅开发时需要）
+# 下载 ASR 模型（约 510 MB 含标点，仅开发时需要）
 # 有本地代理时推荐：
 export VOSI_PROXY=http://127.0.0.1:7890
 ./scripts/download-models.sh
