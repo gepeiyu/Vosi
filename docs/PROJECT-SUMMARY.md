@@ -26,8 +26,8 @@
 | GitHub | https://github.com/gepeiyu/Vosi |
 | 首个公开 Release | [v0.1.0](https://github.com/gepeiyu/Vosi/releases/tag/v0.1.0)（2026-06-06，源码发布） |
 | 当前开发分支 | `feat/v0.1.1-polish`（polish + SenseVoice 升级） |
-| **应用版本号** | **`0.1.0`**（`tauri.conf.json` / `Cargo.toml` / `package.json`） |
-| **本地打包产物** | `Vosi_0.1.0_x64.dmg`（须与版本号一致；发新版前 bump 并全量 `npm run tauri build`） |
+| **应用版本号** | **`0.1.1`**（`tauri.conf.json` / `Cargo.toml` / `package.json`） |
+| **本地打包产物** | `Vosi_0.1.1_x64.dmg`（须与版本号一致；全量 `npm run tauri build` 生成） |
 
 ### 里程碑
 
@@ -258,7 +258,7 @@ npm run tauri build
 | CI clippy + tests（polish 分支） | 2026-06-07 | PASS |
 | SenseVoice 升级 + `cargo test --lib` | 2026-06-08 | 24/24 PASS |
 | macOS E2E SenseVoice dictation | 2026-06-08 | 用户确认正常 |
-| 本地 Release DMG `Vosi_0.1.0_x64.dmg` | 2026-06-08 | 已构建（含 sense-voice + 标点 + VAD） |
+| 本地 Release DMG（v0.1.1） | 2026-06-08 | bump 后须重打 `Vosi_0.1.1_*.dmg` |
 
 ---
 

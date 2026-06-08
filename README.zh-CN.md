@@ -8,12 +8,12 @@ Powered by FunASR 模型，基于 sherpa-onnx 推理。
 
 ![License](https://img.shields.io/badge/license-Apache--2.0-blue)
 ![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows-lightgrey)
-![Release](https://img.shields.io/github/v/release/gepeiyu/Vosi?label=v0.1.0)
+![Release](https://img.shields.io/github/v/release/gepeiyu/Vosi?label=v0.1.1)
 
-## 功能（v0.1）
+## 功能（v0.1.1）
 
-- 全局热键按住说话
-- Paraformer 识别 + 标点 + ITN 数字归一
+- 全局热键按住说话（按住 ≥ 300 ms）
+- SenseVoice 多语识别（中/英/日等，`language=auto`）+ 标点 + ITN
 - 热词后处理替换
 - 浮动录音胶囊（音量条 + 识别中状态）
 - 长句模式：Silero VAD 分段，多句以换行拼接

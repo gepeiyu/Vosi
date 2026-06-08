@@ -13,9 +13,9 @@
 | 功能开发 | v0.1.1 polish + SenseVoice 升级已完成 |
 | CI | `main` / PR 上 macOS clippy + unit tests 已通过 |
 | PR | [#1](https://github.com/gepeiyu/Vosi/pull/1)（`feat/v0.1.1-polish` → `main`） |
-| **应用版本号** | **`0.1.0`**（`tauri.conf.json` / `Cargo.toml` / `package.json`） |
-| **本地 DMG** | `src-tauri/target/release/bundle/dmg/Vosi_0.1.0_x64.dmg`（2026-06-08，Intel macOS） |
-| 版本对应原则 | 安装包文件名 `Vosi_<version>_*.dmg` 须与 `tauri.conf.json` 的 `version` 一致；改版本后须全量 `npm run tauri build`（`--bundles app` 不更新 DMG） |
+| **应用版本号** | **`0.1.1`**（`tauri.conf.json` / `Cargo.toml` / `package.json`） |
+| **本地 DMG** | `Vosi_0.1.1_x64.dmg`（bump 后全量 `npm run tauri build` 生成；旧 `Vosi_0.1.0_x64.dmg` 已过时） |
+| 版本对应原则 | 安装包文件名 `Vosi_<version>_*.dmg` 须与 `tauri.conf.json` 的 `version` 一致 |
 | ASR 模型 | SenseVoice INT8（`sense-voice/`）；已移除 legacy `paraformer-zh/` |
 | 打包体积 | 含标点约 **~510MB**（sense-voice 228MB + punctuation 281MB + VAD） |
 | GitHub Release | 打 `v*` tag 后由 `.github/workflows/release.yml` 自动构建并发布 |
@@ -189,7 +189,7 @@ npm run tauri dev
 |----|------|
 | 开机自启平台注册 | `docs/follow-ups/2026-06-06-start-on-boot-platform-registration.md` |
 | 非激活浮窗（NSPanel） | 本文 §2.3 |
-| bump 版本号 + 打 tag 发 GitHub Release | 本文 §5（当前仍为 0.1.0） |
+| 打 tag `v0.1.1` 发 GitHub Release | 本文 §5 |
 | merge PR #1 | GitHub |
 | Golden WAV + 标点对比（可选） | `tests/fixtures/audio/README.md` |
 

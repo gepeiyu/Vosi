@@ -64,8 +64,8 @@
 
 | 项 | 状态 |
 |----|------|
-| 应用版本 | `0.1.0`（`tauri.conf.json`） |
-| 本地打包 | `Vosi_0.1.0_x64.dmg`（Intel macOS，含 sense-voice + punctuation + VAD） |
+| 应用版本 | `0.1.1`（`tauri.conf.json`） |
+| 本地打包 | `Vosi_0.1.1_x64.dmg`（bump 后重打；含 sense-voice + punctuation + VAD） |
 | 标点对比 | 暂缓；保留 CT-Transformer |
 | Golden WAV | 暂缓（可用 TTS 或官方 test_wavs 后续补） |
 | 推送 | `feat/v0.1.1-polish` → GitHub |
