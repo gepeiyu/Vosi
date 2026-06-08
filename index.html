@@ -15,10 +15,15 @@
         <p class="subtitle">全离线桌面语音输入</p>
       </header>
 
-      <div id="accessibility-banner" class="banner hidden" role="alert">
-        <p id="accessibility-text"></p>
-        <button type="button" id="open-accessibility">打开系统设置</button>
-      </div>
+      <section class="settings-section permissions-section" aria-labelledby="permissions-title">
+        <h2 id="permissions-title">系统权限</h2>
+        <p id="voice-ready-status" class="voice-ready-status">检查中…</p>
+        <ul id="permissions-list" class="permissions-list"></ul>
+        <p id="permissions-tip" class="field-note hidden"></p>
+        <button type="button" id="recheck-permissions" class="secondary-btn">
+          重新检查权限
+        </button>
+      </section>
 
       <form id="settings-form" class="settings-form">
         <section class="settings-section">

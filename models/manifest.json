@@ -1,20 +1,21 @@
 {
-  "version": "0.1.0",
+  "version": "0.2.2",
+  "default_asr": "sense-voice-int8",
   "default_mirror": "auto",
   "proxy_hint": "export VOSI_PROXY=http://127.0.0.1:7890",
   "mirrors": {
     "auto": "有 VOSI_PROXY 时走 HuggingFace/GitHub，否则 hf-mirror",
     "github": "GitHub Releases + huggingface.co（建议配合 VOSI_PROXY）",
     "hf-mirror": "HuggingFace 国内镜像：VOSI_MODEL_MIRROR=hf-mirror ./scripts/download-models.sh",
-    "modelscope": "仅 VAD 备选；ASR/标点须 sherpa 格式"
+    "modelscope": "仅 VAD 备选；ASR 须 sherpa 格式"
   },
   "models": [
     {
-      "id": "paraformer-zh-int8",
-      "dest": "models/dev/paraformer-zh",
-      "modelscope": "crazyant/speech_paraformer_asr_nat-zh-cn-16k-common-vocab8358-onnx",
-      "hf_mirror": "csukuangfj/sherpa-onnx-paraformer-zh-small-2024-03-09",
-      "github": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-paraformer-zh-small-2024-03-09.tar.bz2",
+      "id": "sense-voice-int8",
+      "dest": "models/dev/sense-voice",
+      "github": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17.tar.bz2",
+      "hf_mirror": "csukuangfj/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17",
+      "files": ["model.int8.onnx", "tokens.txt"],
       "sha256": ""
     },
     {
@@ -22,14 +23,6 @@
       "dest": "models/dev/vad",
       "modelscope": "iic/speech_fsmn_vad_zh-cn-16k-common-onnx",
       "github": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx",
-      "sha256": ""
-    },
-    {
-      "id": "punc-ct-transformer",
-      "dest": "models/dev/punctuation",
-      "modelscope": "damo/punc_ct-transformer_cn-en-common-vocab471067-large-onnx",
-      "hf_mirror": "csukuangfj/sherpa-onnx-punct-ct-transformer-zh-en-vocab272727-2024-04-12",
-      "github": "https://github.com/k2-fsa/sherpa-onnx/releases/download/punctuation-models/sherpa-onnx-punct-ct-transformer-zh-en-vocab471067-large.tar.bz2",
       "sha256": ""
     }
   ]

@@ -16,4 +16,12 @@ if [[ ! -d "$SRC" ]] || [[ -z "$(ls -A "$SRC" 2>/dev/null)" ]]; then
 fi
 
 cp -R "$SRC"/. "$DEST"/
+
+# Runtime-only: SenseVoice INT8 + tokens (skip fp32 model.onnx and test assets).
+sv="$DEST/sense-voice"
+if [[ -d "$sv" ]]; then
+  rm -f "$sv/model.onnx" "$sv/export-onnx.py"
+  rm -rf "$sv/test_wavs"
+fi
+
 echo "bundled models from $SRC → $DEST"

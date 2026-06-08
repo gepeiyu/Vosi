@@ -1,5 +1,6 @@
 use crate::app::state::AppState;
 use crate::config::AppConfig;
+use crate::permissions::PermissionsSnapshot;
 
 #[tauri::command]
 pub fn get_config(state: tauri::State<'_, AppState>) -> AppConfig {
@@ -12,38 +13,31 @@ pub fn save_config(state: tauri::State<'_, AppState>, cfg: AppConfig) -> Result<
 }
 
 #[tauri::command]
-pub fn get_accessibility_hint() -> Option<String> {
-    #[cfg(target_os = "macos")]
-    {
-        let mut hint = String::from(
-            "Vosi 需要在「系统设置 → 隐私与安全性」中授权「辅助功能」和「麦克风」。\
-             开发模式（tauri dev）不会显示「Vosi」，请添加本进程可执行文件：",
-        );
-        if let Ok(exe) = std::env::current_exe() {
-            hint.push('\n');
-            hint.push_str(&exe.display().to_string());
-        }
-        hint.push_str(
-            "\n\n热键监听还需要「辅助功能」权限（CGEventTap）。\
-             也可先按住触发键说话，系统弹出麦克风授权时再点允许。\
-             辅助功能需点「+」手动添加上述路径。",
-        );
-        Some(hint)
-    }
-    #[cfg(not(target_os = "macos"))]
-    {
-        None
-    }
+pub fn get_permissions_status(state: tauri::State<'_, AppState>) -> PermissionsSnapshot {
+    crate::permissions::snapshot(state.inner())
 }
 
 #[tauri::command]
-pub fn open_accessibility_settings() -> Result<(), String> {
+pub fn open_permission_settings(permission_id: String) -> Result<(), String> {
+    crate::permissions::open_settings(&permission_id)
+}
+
+#[tauri::command]
+pub fn recheck_permissions(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, AppState>,
+) -> PermissionsSnapshot {
     #[cfg(target_os = "macos")]
     {
-        std::process::Command::new("open")
-            .arg("x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")
-            .spawn()
-            .map_err(|e| e.to_string())?;
+        use crate::permissions::microphone_macos::{is_accessibility_trusted, repair_accessibility};
+        if !is_accessibility_trusted() {
+            let _ = repair_accessibility(true);
+        }
     }
-    Ok(())
+    if crate::permissions::all_granted() {
+        let _ = crate::try_start_voice_pipeline(&app, state.inner());
+    } else if let Some(logger) = state.logger() {
+        logger.info("recheck: permissions still incomplete");
+    }
+    crate::permissions::snapshot(state.inner())
 }

@@ -67,7 +67,7 @@ min_speech_ms = 300
 [asr]
 num_threads = 2
 mode = "short"
-model_variant = "paraformer-large-int8"
+model_variant = "sense-voice-int8"
 
 [hotword]
 enabled = true

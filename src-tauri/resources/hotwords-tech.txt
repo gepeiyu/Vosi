@@ -1,0 +1,182 @@
+A/B test
+A/B testing
+API
+API設計
+APK
+AWS
+Android
+Angular
+Ansible
+Azure
+Bun
+CI/CD
+CLI
+CORS
+CSV
+Cloudflare
+Confluence
+Cursor
+Deno
+DevOps
+Docker
+E2E
+ETL
+Elasticsearch
+Express
+FastAPI
+Figma
+Flutter
+GCP
+GTM
+Git
+GitHub
+GitHub Actions
+GitLab
+Go
+GraphQL
+HTTP
+HTTPS
+Helm
+JSON
+JWT
+Jira
+KPI
+Kafka
+Kubernetes
+Lambda
+Laravel
+Linear
+MVP
+MongoDB
+Next.js
+NoSQL
+Node.js
+Notion
+OAuth
+OIDC
+OKR
+OpenAPI
+PRD
+PostgreSQL
+Postman
+Python
+QA
+REST
+ROI
+React
+Redis
+Rust
+SAML
+SDK
+SLA
+SLO
+SQL
+SSO
+Slack
+Spring Boot
+Svelte
+Swagger
+Swift
+SwiftUI
+TDD
+Tauri
+Terraform
+TypeScript
+UI
+UX
+VS Code
+Vercel
+Vue
+Vue.js
+Web API
+WebAssembly
+WebSocket
+Webhook
+YAML
+acceptance criteria
+async
+await
+backend
+backlog
+cherry-pick
+code review
+commit
+container
+deprecated
+design doc
+design system
+epic
+feature branch
+feature flag
+frontend
+full stack
+gRPC
+go-to-market
+golang
+hotfix
+iOS
+integration test
+linter
+merge conflict
+merge request
+microservices
+middleware
+milestone
+mockup
+monorepo
+node_modules
+north star
+npm
+pain point
+product manager
+product owner
+protobuf
+pull request
+rebase
+refactor
+retrospective
+roadmap
+scrum
+semver
+serverless
+sprint
+sprint planning
+stakeholder
+standup
+story point
+technical debt
+unit test
+use case
+useEffect
+useState
+user acceptance
+user experience
+user interface
+user story
+value proposition
+webpack
+wireframe
+yml
+zero downtime
+コンテナ
+コードレビュー
+スクラム
+スプリント
+テスト
+デプロイ
+バグ
+バックエンド
+バックログ
+フロントエンド
+プロダクト
+マイクロサービス
+リリース
+レビュー
+仕様
+実装
+画面設計
+要件
+要件定義
+設計
+認可
+認証

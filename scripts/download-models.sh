@@ -84,6 +84,8 @@ download_github() {
   local archive
   if [[ "$url" == *.onnx ]]; then
     archive="$dest/model.onnx"
+  elif [[ "$url" == *.tar.bz2 ]]; then
+    archive="$dest/archive.tar.bz2"
   else
     archive="$dest/archive"
   fi
@@ -120,15 +122,14 @@ use_foreign_first() {
   [[ -n "$PROXY" ]] || [[ "$MIRROR" == "github" ]]
 }
 
-# sherpa 预打包 INT8 小模型（与 sherpa-onnx 兼容；魔搭 FunASR ONNX 缺 metadata 不可用）
-download_paraformer() {
-  local dest="$DEST_ROOT/paraformer-zh"
+download_sense_voice() {
+  local dest="$DEST_ROOT/sense-voice"
   mkdir -p "$dest"
 
   if use_foreign_first || [[ "$MIRROR" == "hf-mirror" ]] || [[ "$MIRROR" == "auto" ]]; then
     if try_mirror hf \
-      download_hf_file "csukuangfj/sherpa-onnx-paraformer-zh-small-2024-03-09" "model.int8.onnx" "$dest/model.int8.onnx" \
-      && download_hf_file "csukuangfj/sherpa-onnx-paraformer-zh-small-2024-03-09" "tokens.txt" "$dest/tokens.txt"; then
+      download_hf_file "csukuangfj/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17" "model.int8.onnx" "$dest/model.int8.onnx" \
+      && download_hf_file "csukuangfj/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17" "tokens.txt" "$dest/tokens.txt"; then
       return 0
     fi
     [[ "$MIRROR" == "hf-mirror" ]] && return 1
@@ -136,7 +137,7 @@ download_paraformer() {
 
   if [[ "$MIRROR" == "github" ]] || [[ "$MIRROR" == "auto" ]]; then
     try_mirror github download_github \
-      "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-paraformer-zh-small-2024-03-09.tar.bz2" \
+      "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17.tar.bz2" \
       "$dest" && return 0
     [[ "$MIRROR" == "github" ]] && return 1
   fi
@@ -169,38 +170,12 @@ download_vad() {
     "$dest"
 }
 
-# sherpa 标点模型（魔搭 model_quant.onnx 不兼容）
-download_punctuation() {
-  local dest="$DEST_ROOT/punctuation"
-  mkdir -p "$dest"
-  # 去掉不完整的 model.onnx 或魔搭 quant 残留，避免误用
-  rm -f "$dest/model.onnx" "$dest/model_quant.onnx"
-
-  if use_foreign_first || [[ "$MIRROR" == "hf-mirror" ]] || [[ "$MIRROR" == "auto" ]]; then
-    if try_mirror hf \
-      download_hf_file "csukuangfj/sherpa-onnx-punct-ct-transformer-zh-en-vocab272727-2024-04-12" "model.onnx" "$dest/model.onnx"; then
-      return 0
-    fi
-    [[ "$MIRROR" == "hf-mirror" ]] && return 1
-  fi
-
-  if [[ "$MIRROR" == "github" ]] || [[ "$MIRROR" == "auto" ]]; then
-    try_mirror github download_github \
-      "https://github.com/k2-fsa/sherpa-onnx/releases/download/punctuation-models/sherpa-onnx-punct-ct-transformer-zh-en-vocab272727-2024-04-12.tar.bz2" \
-      "$dest" && return 0
-    [[ "$MIRROR" == "github" ]] && return 1
-  fi
-
-  return 1
-}
-
 setup_proxy_env
 mkdir -p "$DEST_ROOT"
 log "mirror=$MIRROR dest=$DEST_ROOT"
 
-download_paraformer
+download_sense_voice
 download_vad
-download_punctuation
 
 log "Done → $DEST_ROOT"
 if [[ -z "$PROXY" ]]; then

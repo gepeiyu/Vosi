@@ -21,3 +21,12 @@
 - `cargo test --lib`: 18 passed, 2 ignored
 - `npm run build`: PASS
 - 额外提交: clipboard 测试沙箱兼容修复
+
+## 收尾（2026-06-07）
+
+详见 **[2026-06-07-v01-polish-wrap-up.md](./2026-06-07-v01-polish-wrap-up.md)**，主要包括：
+
+- 300 ms 按住说话、右 Command 独占热键
+- Vosi 品牌图标 + `scripts/generate-logo.py`
+- 模型 bundle 路径修复、三平台 Release CI
+- commit: `21a8458`

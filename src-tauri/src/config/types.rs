@@ -28,6 +28,10 @@ pub struct AsrConfig {
     pub num_threads: u32,
     pub mode: String,
     pub model_variant: String,
+    #[serde(default = "default_asr_language")]
+    pub language: String,
+    #[serde(default = "default_use_itn")]
+    pub use_itn: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -58,6 +62,14 @@ impl Default for OverlayConfig {
     }
 }
 
+fn default_asr_language() -> String {
+    "auto".into()
+}
+
+fn default_use_itn() -> bool {
+    true
+}
+
 /// macOS: 空格右侧 Command；Windows: 空格右侧 Alt
 pub fn default_trigger_key() -> String {
     if cfg!(target_os = "macos") {
@@ -82,7 +94,9 @@ impl Default for AppConfig {
             asr: AsrConfig {
                 num_threads: 2,
                 mode: "short".into(),
-                model_variant: "paraformer-large-int8".into(),
+                model_variant: "sense-voice-int8".into(),
+                language: default_asr_language(),
+                use_itn: default_use_itn(),
             },
             hotword: HotwordConfig {
                 enabled: true,
@@ -97,5 +111,34 @@ impl Default for AppConfig {
             },
             overlay: OverlayConfig { enabled: true },
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn asr_config_deserializes_with_defaults_for_new_fields() {
+        let raw = r#"
+num_threads = 2
+mode = "short"
+model_variant = "sense-voice-int8"
+"#;
+        #[derive(serde::Deserialize)]
+        struct Wrapper {
+            asr: AsrConfig,
+        }
+        let cfg: Wrapper = toml::from_str(&format!("[asr]\n{raw}")).unwrap();
+        assert_eq!(cfg.asr.language, "auto");
+        assert!(cfg.asr.use_itn);
+    }
+
+    #[test]
+    fn asr_config_default_values() {
+        let cfg = AppConfig::default();
+        assert_eq!(cfg.asr.model_variant, "sense-voice-int8");
+        assert_eq!(cfg.asr.language, "auto");
+        assert!(cfg.asr.use_itn);
     }
 }

@@ -1,0 +1,122 @@
+[
+  {
+    "id": "zh_pure_1",
+    "file": "zh_pure_1.wav",
+    "category": "zh",
+    "script": "今天开会讨论一下新功能的排期。",
+    "must_contain": ["开会", "排期"],
+    "must_not_contain": []
+  },
+  {
+    "id": "zh_pure_2",
+    "file": "zh_pure_2.wav",
+    "category": "zh",
+    "script": "这个功能的实现方案需要评审。",
+    "must_contain": ["功能"],
+    "must_not_contain": []
+  },
+  {
+    "id": "zh_pure_3",
+    "file": "zh_pure_3.wav",
+    "category": "zh",
+    "script": "请完成单元测试和集成测试。",
+    "must_contain": ["测试"],
+    "must_not_contain": []
+  },
+  {
+    "id": "en_tech_react",
+    "file": "en_tech_react.wav",
+    "category": "en",
+    "script": "用 React 实现这个 API 的接口",
+    "must_contain": ["React", "API"],
+    "must_not_contain": ["瑞爱克特"]
+  },
+  {
+    "id": "en_tech_ts",
+    "file": "en_tech_ts.wav",
+    "category": "en",
+    "script": "用 TypeScript 重写这个组件的逻辑",
+    "must_contain": ["TypeScript"],
+    "must_not_contain": []
+  },
+  {
+    "id": "en_tech_pr",
+    "file": "en_tech_pr.wav",
+    "category": "en",
+    "script": "请帮我提交一个 pull request",
+    "must_contain": ["pull request"],
+    "must_not_contain": []
+  },
+  {
+    "id": "en_tech_k8s",
+    "file": "en_tech_k8s.wav",
+    "category": "en",
+    "script": "把这个服务部署到 Kubernetes 集群",
+    "must_contain": ["Kubernetes"],
+    "must_not_contain": []
+  },
+  {
+    "id": "ja_mixed_impl",
+    "file": "ja_mixed_impl.wav",
+    "category": "ja",
+    "script": "这个功能的実装需要用 TypeScript",
+    "must_contain": ["実装"],
+    "must_not_contain": []
+  },
+  {
+    "id": "ja_mixed_design",
+    "file": "ja_mixed_design.wav",
+    "category": "ja",
+    "script": "先看一下这个模块的設計文档",
+    "must_contain": ["設計"],
+    "must_not_contain": []
+  },
+  {
+    "id": "ja_mixed_bug",
+    "file": "ja_mixed_bug.wav",
+    "category": "ja",
+    "script": "线上有个バグ需要紧急修复",
+    "must_contain": ["バグ"],
+    "must_not_contain": []
+  },
+  {
+    "id": "trilingual_1",
+    "file": "trilingual_1.wav",
+    "category": "mixed",
+    "script": "这个 API の設計 review 一下再 deploy",
+    "must_contain": ["API"],
+    "must_not_contain": []
+  },
+  {
+    "id": "trilingual_2",
+    "file": "trilingual_2.wav",
+    "category": "mixed",
+    "script": "先在 staging 环境 deploy 一下",
+    "must_contain": ["deploy"],
+    "must_not_contain": []
+  },
+  {
+    "id": "trilingual_3",
+    "file": "trilingual_3.wav",
+    "category": "mixed",
+    "script": "请 review 一下这个方案的 feasibility",
+    "must_contain": ["review"],
+    "must_not_contain": []
+  },
+  {
+    "id": "pm_mvp",
+    "file": "pm_mvp.wav",
+    "category": "pm",
+    "script": "下个 sprint 的 MVP 需求和 KPI 对齐一下",
+    "must_contain": ["MVP", "KPI"],
+    "must_not_contain": []
+  },
+  {
+    "id": "pm_sprint",
+    "file": "pm_sprint.wav",
+    "category": "pm",
+    "script": "这个 sprint 的目标是完成 backlog 梳理",
+    "must_contain": ["sprint"],
+    "must_not_contain": []
+  }
+]

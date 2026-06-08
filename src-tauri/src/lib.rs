@@ -8,18 +8,20 @@ pub mod inject;
 pub mod log;
 pub mod notify;
 pub mod overlay;
+pub mod permissions;
 pub mod pipeline;
 pub mod post;
 
 use app::state::AppState;
 use app::tray::{self, TrayStatus};
+use asr::ModelManager;
+use permissions::SetupPhase;
 use config::AppConfig;
 use hotkey::listener::{self, HotkeyEvent};
 use inject::{default_injector, inject_with_fallback, method_from_config};
 use notify::Notifier;
 use overlay::{OverlayController, OverlayState};
 use log::Logger;
-use asr::ModelManager;
 use pipeline::session::VoiceSession;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -28,8 +30,55 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 const MIN_HOLD_MS: u64 = 300;
+
+enum PipelineEvent {
+    Hotkey(HotkeyEvent),
+}
+
+fn begin_recording(
+    session: &mut VoiceSession,
+    app: &tauri::AppHandle,
+    overlay: &OverlayController,
+    level_updates_active: &mut Option<Arc<AtomicBool>>,
+    logger: &Logger,
+    notifier: &Notifier,
+) -> Result<(), String> {
+    tray::set_status(app, TrayStatus::Recording);
+    overlay.emit(OverlayState::Recording { level: 0.0 });
+    let level_active = Arc::new(AtomicBool::new(true));
+    *level_updates_active = Some(Arc::clone(&level_active));
+    let (level_tx, level_rx) = mpsc::channel::<f32>();
+    let level_overlay = overlay.clone();
+    thread::spawn(move || {
+        while let Ok(level) = level_rx.recv() {
+            if !level_active.load(Ordering::Relaxed) {
+                break;
+            }
+            level_overlay.emit(OverlayState::Recording { level });
+        }
+    });
+    if let Err(err) = session.on_hotkey_press_with_level(Some(level_tx)) {
+        if let Some(active) = level_updates_active.take() {
+            active.store(false, Ordering::Relaxed);
+        }
+        logger.error(&format!("recording start failed: {err}"));
+        if err.contains("no input device") {
+            notifier.error("未检测到麦克风");
+        }
+        overlay.emit(OverlayState::Hidden);
+        tray::set_status(app, TrayStatus::Warning);
+        return Err(err);
+    }
+    Ok(())
+}
+
+fn stop_level_updates(level_updates_active: &mut Option<Arc<AtomicBool>>) {
+    if let Some(active) = level_updates_active.take() {
+        active.store(false, Ordering::Relaxed);
+    }
+}
 use tauri::menu::{Menu, MenuItem};
-use tauri::Manager;
+use tauri::{Emitter, Manager, WindowEvent};
 
 fn models_data_dir() -> PathBuf {
     dirs::data_dir()
@@ -41,7 +90,7 @@ fn dev_models_dir() -> Option<PathBuf> {
     #[cfg(debug_assertions)]
     {
         let dev = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../models/dev");
-        if ModelManager::paraformer_ready(&dev) {
+        if crate::asr::ModelManager::sense_voice_ready(&dev) {
             return Some(dev);
         }
     }
@@ -65,14 +114,52 @@ fn spawn_voice_pipeline(
     notifier: Notifier,
 ) {
     let (hotkey_tx, hotkey_rx) = mpsc::channel::<HotkeyEvent>();
+    let (pipeline_tx, pipeline_rx) = mpsc::channel::<PipelineEvent>();
+    let hotkey_pipeline_tx = pipeline_tx.clone();
     listener::spawn_hotkey_listener(&config.hotkey.trigger_key, hotkey_tx);
+
+    thread::spawn(move || {
+        for event in hotkey_rx {
+            let _ = hotkey_pipeline_tx.send(PipelineEvent::Hotkey(event));
+        }
+    });
 
     let inject_method = method_from_config(&config.inject.method);
     thread::spawn(move || {
+        let state = app.state::<AppState>();
+        let models_root = models_data_dir();
+        let mgr = ModelManager::new(models_root.clone());
+
+        if ModelManager::needs_install(&models_root, &bundled) {
+            state.set_setup(
+                SetupPhase::InstallingModels,
+                Some("正在安装语音模型，首次启动约需 1–2 分钟…".into()),
+            );
+            let _ = app.emit("setup-updated", ());
+            logger.info("installing bundled speech models");
+            tray::set_status(&app, TrayStatus::Warning);
+            if let Err(err) = mgr.ensure_installed(&bundled, dev_models.as_deref()) {
+                let msg = format!("语音模型安装失败: {err}");
+                logger.error(&msg);
+                state.set_setup(SetupPhase::Error, Some(msg));
+                state.clear_pipeline_spawned();
+                let _ = app.emit("setup-updated", ());
+                notifier.error("语音引擎不可用，请重新安装");
+                return;
+            }
+            logger.info("speech models installed");
+        }
+
+        state.set_setup(
+            SetupPhase::LoadingEngine,
+            Some("正在加载语音引擎…".into()),
+        );
+        let _ = app.emit("setup-updated", ());
+
         let injector = default_injector();
         let mut session = match VoiceSession::try_new(
             config,
-            models_data_dir(),
+            models_root,
             &bundled,
             dev_models.as_deref(),
             logger.clone(),
@@ -80,64 +167,70 @@ fn spawn_voice_pipeline(
             Ok(session) => session,
             Err(err) => {
                 logger.error(&format!("voice pipeline unavailable: {err}"));
+                state.set_setup(
+                    SetupPhase::Error,
+                    Some("语音引擎加载失败，请重新安装".into()),
+                );
+                state.clear_pipeline_spawned();
+                let _ = app.emit("setup-updated", ());
                 notifier.error("语音引擎不可用，请重新安装");
                 tray::set_status(&app, TrayStatus::Warning);
                 return;
             }
         };
 
+        state.mark_pipeline_started();
+        let _ = app.emit("setup-updated", ());
+        tray::set_status(&app, TrayStatus::Idle);
+        logger.info("voice pipeline ready");
+
         let mut level_updates_active: Option<Arc<AtomicBool>> = None;
         let mut press_started: Option<Instant> = None;
 
-        while let Ok(event) = hotkey_rx.recv() {
+        while let Ok(event) = pipeline_rx.recv() {
             match event {
-                HotkeyEvent::Pressed => {
+                PipelineEvent::Hotkey(HotkeyEvent::Pressed) => {
+                    if session.is_recording() {
+                        continue;
+                    }
                     logger.info("hotkey pressed");
                     press_started = Some(Instant::now());
-                    tray::set_status(&app, TrayStatus::Recording);
-                    overlay.emit(OverlayState::Recording { level: 0.0 });
-                    let level_active = Arc::new(AtomicBool::new(true));
-                    level_updates_active = Some(Arc::clone(&level_active));
-                    let (level_tx, level_rx) = mpsc::channel::<f32>();
-                    let level_overlay = overlay.clone();
-                    thread::spawn(move || {
-                        while let Ok(level) = level_rx.recv() {
-                            if !level_active.load(Ordering::Relaxed) {
-                                break;
-                            }
-                            level_overlay.emit(OverlayState::Recording { level });
-                        }
-                    });
-                    if let Err(err) = session.on_hotkey_press_with_level(Some(level_tx)) {
+                    if begin_recording(
+                        &mut session,
+                        &app,
+                        &overlay,
+                        &mut level_updates_active,
+                        &logger,
+                        &notifier,
+                    )
+                    .is_err()
+                    {
                         press_started = None;
-                        if let Some(active) = level_updates_active.take() {
-                            active.store(false, Ordering::Relaxed);
-                        }
-                        logger.error(&format!("recording start failed: {err}"));
-                        if err.contains("no input device") {
-                            notifier.error("未检测到麦克风");
-                        }
-                        overlay.emit(OverlayState::Hidden);
-                        tray::set_status(&app, TrayStatus::Warning);
                     }
                 }
-                HotkeyEvent::Released => {
-                    if let Some(active) = level_updates_active.take() {
-                        active.store(false, Ordering::Relaxed);
-                    }
-
+                PipelineEvent::Hotkey(HotkeyEvent::Released) => {
                     let held_ms = press_started
                         .take()
                         .map(|t| t.elapsed().as_millis())
                         .unwrap_or(0);
 
                     if held_ms < MIN_HOLD_MS as u128 {
+                        if session.is_recording() {
+                            session.cancel_recording();
+                            stop_level_updates(&mut level_updates_active);
+                            overlay.emit(OverlayState::Hidden);
+                            tray::set_status(&app, TrayStatus::Idle);
+                        }
                         logger.info("hotkey tap ignored");
-                        session.cancel_recording();
-                        overlay.emit(OverlayState::Hidden);
-                        tray::set_status(&app, TrayStatus::Idle);
                         continue;
                     }
+
+                    if !session.is_recording() {
+                        logger.info("hotkey released without active recording");
+                        continue;
+                    }
+
+                    stop_level_updates(&mut level_updates_active);
 
                     logger.info("hotkey released");
                     overlay.emit(OverlayState::Processing);
@@ -147,10 +240,17 @@ fn spawn_voice_pipeline(
                                 inject_with_fallback(injector.as_ref(), &text, inject_method);
                             overlay.emit(OverlayState::Hidden);
                             if !result.injected {
-                                logger.error(
-                                    "text injection failed: missing accessibility permission",
-                                );
-                                notifier.error("已复制到剪贴板，请手动粘贴");
+                                let detail = result.error.as_deref().unwrap_or("unknown");
+                                logger.error(&format!("text injection failed: {detail}"));
+                                if cfg!(target_os = "macos")
+                                    && !crate::permissions::is_accessibility_trusted()
+                                {
+                                    notifier.error(
+                                        "文本注入失败：请在设置页点击「修复权限」重新授权辅助功能",
+                                    );
+                                } else {
+                                    notifier.error("已复制到剪贴板，请手动粘贴");
+                                }
                                 tray::set_status(&app, TrayStatus::Warning);
                                 schedule_tray_reset(app.clone(), 3);
                             } else {
@@ -186,8 +286,52 @@ fn setup_tray_menu(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     if let Some(tray) = app.tray_by_id("main") {
         tray.set_menu(Some(menu))?;
     }
-    tray::set_status(app.handle(), TrayStatus::Idle);
     Ok(())
+}
+
+pub fn try_start_voice_pipeline(app: &tauri::AppHandle, state: &AppState) -> bool {
+    if state.voice_ready() {
+        return true;
+    }
+    if state.pipeline_spawned() {
+        return false;
+    }
+    if !permissions::all_granted() {
+        return false;
+    }
+    let Some(logger) = state.logger() else {
+        return false;
+    };
+    let Some(bundled) = state.bundled() else {
+        return false;
+    };
+    if ModelManager::needs_install(&models_data_dir(), &bundled) {
+        state.set_setup(
+            SetupPhase::InstallingModels,
+            Some("正在安装语音模型，首次启动约需 1–2 分钟…".into()),
+        );
+        tray::show_settings_window(app);
+        tray::set_status(app, TrayStatus::Warning);
+    } else {
+        state.set_setup(
+            SetupPhase::LoadingEngine,
+            Some("正在加载语音引擎…".into()),
+        );
+    }
+    state.mark_pipeline_spawned();
+    let config = state.get_config();
+    let overlay = OverlayController::new(app.clone(), config.overlay.enabled);
+    let notifier = Notifier::new(app.clone());
+    spawn_voice_pipeline(
+        app.clone(),
+        config,
+        bundled,
+        state.dev_models(),
+        logger,
+        overlay,
+        notifier,
+    );
+    true
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -207,27 +351,36 @@ pub fn run() {
         .plugin(tauri_plugin_notification::init())
         .manage(app_state)
         .setup(move |app| {
+            tray::configure_background_app(app.handle());
             setup_tray_menu(app)?;
-            let overlay = OverlayController::new(
-                app.handle().clone(),
-                config.overlay.enabled,
-            );
-            let notifier = Notifier::new(app.handle().clone());
             let bundled = app
                 .path()
                 .resource_dir()
                 .map(|dir| dir.join("models/bundled"))
                 .unwrap_or_else(|_| PathBuf::from("models/bundled"));
-            spawn_voice_pipeline(
-                app.handle().clone(),
-                config,
+            app.state::<AppState>().init_runtime(
+                logger.clone(),
                 bundled,
                 dev_models_dir(),
-                logger,
-                overlay,
-                notifier,
             );
+            let app_state = app.state::<AppState>().inner();
+            let ready = permissions::run_startup_gate(app.handle(), logger.clone(), app_state);
+            if ready {
+                try_start_voice_pipeline(app.handle(), app_state);
+            } else {
+                app_state.set_setup(SetupPhase::WaitingPermissions, None);
+                logger.info("voice pipeline waiting for permissions");
+            }
             Ok(())
+        })
+        .on_window_event(|window, event| {
+            if window.label() != "main" {
+                return;
+            }
+            if let WindowEvent::CloseRequested { api, .. } = event {
+                api.prevent_close();
+                tray::on_settings_close_requested(window);
+            }
         })
         .on_menu_event(|app, event| {
             let id = event.id().0.as_str();
@@ -240,8 +393,9 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::get_config,
             commands::save_config,
-            commands::get_accessibility_hint,
-            commands::open_accessibility_settings,
+            commands::get_permissions_status,
+            commands::open_permission_settings,
+            commands::recheck_permissions,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

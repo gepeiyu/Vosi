@@ -13,15 +13,16 @@ Vosi v0.1 使用 FunASR 生态导出的 ONNX 模型，通过 [sherpa-onnx](https
 
 | 角色 | 模型 ID | 来源 | 说明 |
 |------|---------|------|------|
-| ASR | paraformer-zh-int8 | [sherpa-onnx ASR models](https://github.com/k2-fsa/sherpa-onnx/releases/tag/asr-models) | FunASR Paraformer 中文 INT8 |
-| VAD | silero-vad | 同上 | 静音检测（v0.1 管线预留） |
-| 标点 | punc-ct-transformer | [sherpa-onnx punctuation models](https://github.com/k2-fsa/sherpa-onnx/releases/tag/punctuation-models) | CT-Transformer 中英标点 |
+| ASR | sense-voice-int8 | [sherpa-onnx ASR models](https://github.com/k2-fsa/sherpa-onnx/releases/tag/asr-models) | SenseVoice 多语 INT8（`sense-voice/`，~228MB） |
+| VAD | silero-vad | 同上 | 静音检测（长文模式分段） |
+
+默认 `model_variant = "sense-voice-int8"`。引擎配置：`language = "auto"`（自动检测语种）、`use_itn = true`（内置 ITN 与标点，无需独立标点模型）。
 
 完整 URL 与 SHA256 见 [`models/manifest.json`](../../models/manifest.json)。
 
 ## 下载
 
-**重要**：ASR 与标点须使用 **sherpa-onnx 预打包** 的 ONNX（含 `vocab_size` / `tokens` metadata）。魔搭上的 FunASR 原生 ONNX（`model_quant.onnx`）与 sherpa-onnx **不兼容**。
+**重要**：ASR 须使用 **sherpa-onnx 预打包** 的 ONNX（含 `tokens.txt` metadata）。魔搭上的 FunASR 原生 ONNX（`model_quant.onnx`）与 sherpa-onnx **不兼容**。
 
 ```bash
 # 推荐：本地 VPN 代理 + HuggingFace / GitHub（最快、格式正确）
@@ -38,8 +39,7 @@ VOSI_MODEL_MIRROR=github ./scripts/download-models.sh
 
 | 组件 | 来源 | 说明 |
 |------|------|------|
-| ASR | [csukuangfj/sherpa-onnx-paraformer-zh-small](https://huggingface.co/csukuangfj/sherpa-onnx-paraformer-zh-small-2024-03-09) | sherpa INT8，~78MB |
-| 标点 | [csukuangfj/sherpa-onnx-punct-ct-transformer](https://huggingface.co/csukuangfj/sherpa-onnx-punct-ct-transformer-zh-en-vocab272727-2024-04-12) | sherpa 格式，~280MB |
+| ASR | [csukuangfj/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17](https://huggingface.co/csukuangfj/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17) | sherpa INT8，~228MB，安装到 `sense-voice/` |
 | VAD | GitHub `silero_vad.onnx` | ~2MB；魔搭 FSMN 为备选 |
 
 模型安装到 `models/dev/`，发布构建前执行：
@@ -52,8 +52,7 @@ VOSI_MODEL_MIRROR=github ./scripts/download-models.sh
 
 ## FunASR 溯源
 
-- **Paraformer**：阿里达摩院 FunASR 中文语音识别模型
-- **标点模型**：FunASR CT-Transformer 标点恢复
+- **SenseVoice**：阿里达摩院 FunASR 多语种语音识别模型（中/英/日/韩/粤），内置 ITN 与基础标点
 - **导出格式**：ONNX（由 sherpa-onnx 项目预导出，非 Python FunASR SDK 运行时）
 
 Vosi 不在用户侧运行 Python 或 FunASR 代码，仅加载 ONNX 权重。

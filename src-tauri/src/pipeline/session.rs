@@ -1,11 +1,12 @@
-use crate::asr::engine::AsrEngine;
-use crate::asr::punctuation::PunctuationEngine;
+use crate::asr::engine::{AsrEngine, AsrEngineOptions};
 use crate::asr::ModelManager;
 use crate::audio::capture::AudioCapture;
+use crate::audio::level::rms_level;
+use crate::audio::resample::resample_linear;
 use crate::audio::vad::VadEngine;
 use crate::config::AppConfig;
 use crate::log::Logger;
-use crate::post::hotword::HotwordReplacer;
+use crate::post::hotword::{merge_builtin_hotwords, HotwordReplacer};
 use crate::post::pipeline::post_process;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc;
@@ -13,6 +14,8 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 const INFERENCE_TIMEOUT: Duration = Duration::from_secs(5);
+/// Reject near-silent clips that make SenseVoice hallucinate ("Yeah.", "Okay.", etc.).
+const MIN_RECORDING_RMS: f32 = 0.004;
 
 pub enum SessionState {
     Idle,
@@ -21,7 +24,6 @@ pub enum SessionState {
 
 pub struct VoiceSession {
     asr: AsrEngine,
-    punc: PunctuationEngine,
     hotwords: HotwordReplacer,
     config: AppConfig,
     logger: Arc<Logger>,
@@ -41,9 +43,28 @@ impl VoiceSession {
         let paths = mgr
             .ensure_installed(bundled, dev_models)
             .map_err(|e| e.to_string())?;
-        let asr = AsrEngine::new(&paths.paraformer_dir, config.asr.num_threads as i32)?;
-        let punc = PunctuationEngine::new(&paths.punc_dir, config.asr.num_threads as i32)?;
+        if !ModelManager::sense_voice_ready(&mgr.models_dir()) {
+            return Err(
+                "sense-voice model not found — run ./scripts/download-models.sh to install"
+                    .into(),
+            );
+        }
+        let asr = AsrEngine::new(
+            &paths.sense_voice_dir,
+            config.asr.num_threads as i32,
+            AsrEngineOptions {
+                language: config.asr.language.clone(),
+                use_itn: config.asr.use_itn,
+            },
+        )?;
+        const BUILTIN_HOTWORDS: &str = include_str!("../../resources/hotwords-tech.txt");
         let hotword_path = expand_tilde(&config.hotword.file);
+        let builtin: Vec<&str> = BUILTIN_HOTWORDS
+            .lines()
+            .map(|l| l.trim())
+            .filter(|l| !l.is_empty())
+            .collect();
+        let _ = merge_builtin_hotwords(&hotword_path, &builtin);
         let hotwords = HotwordReplacer::from_file(&hotword_path)
             .unwrap_or_else(|_| HotwordReplacer::from_lines(vec![]));
 
@@ -61,7 +82,6 @@ impl VoiceSession {
 
         Ok(Self {
             asr,
-            punc,
             hotwords,
             config,
             logger,
@@ -97,6 +117,10 @@ impl VoiceSession {
         }
     }
 
+    pub fn is_recording(&self) -> bool {
+        matches!(self.state, SessionState::Recording(_))
+    }
+
     pub fn on_hotkey_release(&mut self) -> Result<Option<String>, String> {
         let capture = match std::mem::replace(&mut self.state, SessionState::Idle) {
             SessionState::Recording(c) => c,
@@ -112,15 +136,34 @@ impl VoiceSession {
         }
 
         let sample_count = samples.len();
+        let duration_ms = (sample_count as u64 * 1000) / sample_rate as u64;
+        let recording_rms = rms_level(&samples);
+        self.logger.info(&format!(
+            "recording duration_ms={duration_ms} rms={recording_rms:.4}"
+        ));
+        if recording_rms < MIN_RECORDING_RMS {
+            self.logger.info("recording discarded: too quiet");
+            return Ok(None);
+        }
+
         let started = Instant::now();
+        let target_rate = self.config.audio.sample_rate;
+        let (samples, asr_rate) = if sample_rate != target_rate {
+            self.logger.info(&format!(
+                "resampling audio {sample_rate}Hz → {target_rate}Hz"
+            ));
+            (resample_linear(&samples, sample_rate, target_rate), target_rate)
+        } else {
+            (samples, sample_rate)
+        };
         let result = finalize_recording(
             &self.asr,
-            &self.punc,
             &self.hotwords,
             &self.config,
             self.vad.as_ref(),
             samples,
-            sample_rate,
+            asr_rate,
+            &self.logger,
         );
         self.logger.info(&format!(
             "inference_ms={} sample_count={} sample_rate={}",
@@ -138,16 +181,31 @@ pub fn join_segments(parts: &[String]) -> String {
 
 fn finalize_recording(
     asr: &AsrEngine,
-    punc: &PunctuationEngine,
     hotwords: &HotwordReplacer,
     config: &AppConfig,
     vad_engine: Option<&VadEngine>,
     samples: Vec<f32>,
     sample_rate: u32,
+    logger: &Logger,
 ) -> Result<Option<String>, String> {
+    let total_samples = samples.len();
     let segments: Vec<Vec<f32>> = if config.asr.mode == "long" {
         if let Some(vad) = vad_engine {
-            vad.segment(&samples, config.audio.min_speech_ms)
+            let segs = vad.segment(&samples, config.audio.min_speech_ms);
+            let kept: usize = segs.iter().map(|s| s.len()).sum();
+            if segs.is_empty() || kept * 3 < total_samples {
+                logger.info(&format!(
+                    "vad kept {kept}/{total_samples} samples in {} segments — using full clip",
+                    segs.len()
+                ));
+                vec![samples]
+            } else {
+                logger.info(&format!(
+                    "vad segmented {total_samples} samples into {} parts ({kept} kept)",
+                    segs.len()
+                ));
+                segs
+            }
         } else {
             vec![samples]
         }
@@ -173,12 +231,8 @@ fn finalize_recording(
                     if raw.trim().is_empty() {
                         return None;
                     }
-                    let punctuated = punc.punctuate(&raw);
-                    Some(post_process(
-                        &punctuated,
-                        hotwords,
-                        hotword_enabled,
-                    ))
+                    logger.info(&format!("asr raw: {}", truncate_log(&raw, 120)));
+                    Some(post_process(&raw, hotwords, hotword_enabled))
                 })
                 .collect();
             let _ = tx.send(texts);
@@ -216,6 +270,13 @@ fn expand_tilde(path: &str) -> PathBuf {
     } else {
         PathBuf::from(path)
     }
+}
+
+fn truncate_log(text: &str, max_chars: usize) -> String {
+    if text.chars().count() <= max_chars {
+        return text.to_string();
+    }
+    format!("{}…", text.chars().take(max_chars).collect::<String>())
 }
 
 #[cfg(test)]

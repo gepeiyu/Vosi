@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 
 type AppConfig = {
   hotkey: { trigger_key: string; mode: string };
@@ -14,21 +15,123 @@ type AppConfig = {
   overlay: { enabled: boolean };
 };
 
+type SetupPhase =
+  | "waiting_permissions"
+  | "installing_models"
+  | "loading_engine"
+  | "ready"
+  | "error";
+
+type PermissionsSnapshot = {
+  all_granted: boolean;
+  voice_ready: boolean;
+  setup_phase: SetupPhase;
+  setup_message: string | null;
+  permissions: Array<{
+    id: string;
+    label: string;
+    description: string;
+    granted: boolean;
+    action_label: string;
+  }>;
+  reinstall_tip: string | null;
+};
+
 function byId<T extends HTMLElement>(id: string): T {
   const el = document.getElementById(id);
   if (!el) throw new Error(`missing element #${id}`);
   return el as T;
 }
 
-async function loadAccessibilityBanner() {
-  const hint = await invoke<string | null>("get_accessibility_hint");
-  if (!hint) return;
-  const banner = byId<HTMLDivElement>("accessibility-banner");
-  byId<HTMLParagraphElement>("accessibility-text").textContent = hint;
-  banner.classList.remove("hidden");
-  byId<HTMLButtonElement>("open-accessibility").addEventListener("click", () => {
-    invoke("open_accessibility_settings").catch(console.error);
-  });
+function voiceStatusText(snap: PermissionsSnapshot): string {
+  if (snap.voice_ready) {
+    return "语音功能：就绪";
+  }
+  if (!snap.all_granted) {
+    return "语音功能：未就绪（请先开启下方全部权限）";
+  }
+  switch (snap.setup_phase) {
+    case "installing_models":
+      return snap.setup_message ?? "语音功能：正在安装语音模型…";
+    case "loading_engine":
+      return snap.setup_message ?? "语音功能：正在加载语音引擎…";
+    case "error":
+      return snap.setup_message ?? "语音功能：安装失败，请重新安装";
+    default:
+      return "语音功能：启动中…";
+  }
+}
+
+function renderPermissions(snap: PermissionsSnapshot) {
+  const voiceStatus = byId<HTMLParagraphElement>("voice-ready-status");
+  voiceStatus.textContent = voiceStatusText(snap);
+  voiceStatus.className = `voice-ready-status${
+    snap.voice_ready ? " is-ready" : snap.setup_phase === "error" ? " is-error" : " is-blocked"
+  }`;
+
+  const list = byId<HTMLUListElement>("permissions-list");
+  list.replaceChildren(
+    ...snap.permissions.map((item) => {
+      const li = document.createElement("li");
+      li.className = `permission-row${item.granted ? " is-granted" : ""}`;
+
+      const name = document.createElement("span");
+      name.className = "permission-name";
+      name.textContent = item.label;
+
+      const desc = document.createElement("span");
+      desc.className = "permission-desc";
+      desc.textContent = item.description;
+
+      const status = document.createElement("span");
+      status.className = "permission-status";
+      status.textContent = item.granted ? "已授权" : "未授权";
+
+      li.append(name, desc, status);
+
+      if (!item.granted) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "secondary-btn permission-action";
+        btn.textContent = item.action_label || "去设置";
+        btn.addEventListener("click", async () => {
+          btn.disabled = true;
+          try {
+            await invoke("open_permission_settings", { permissionId: item.id });
+            byId<HTMLParagraphElement>("permissions-tip").textContent =
+              item.id === "accessibility"
+                ? "已尝试清除旧授权并打开系统设置。若弹出密码框请输入 Mac 登录密码，然后在辅助功能列表中重新添加 Vosi，再点「重新检查权限」。"
+                : "已打开系统设置，请开启权限后返回并点击「重新检查权限」。";
+            byId<HTMLParagraphElement>("permissions-tip").classList.remove("hidden");
+          } catch (err) {
+            console.error(err);
+            byId<HTMLParagraphElement>("permissions-tip").textContent =
+              "无法打开系统设置，请手动前往：系统设置 → 隐私与安全性";
+            byId<HTMLParagraphElement>("permissions-tip").classList.remove("hidden");
+          } finally {
+            btn.disabled = false;
+          }
+        });
+        li.append(btn);
+      }
+
+      return li;
+    }),
+  );
+
+  const tip = byId<HTMLParagraphElement>("permissions-tip");
+  if (snap.reinstall_tip) {
+    tip.textContent = snap.reinstall_tip;
+    tip.classList.remove("hidden");
+  } else {
+    tip.textContent = "";
+    tip.classList.add("hidden");
+  }
+}
+
+async function loadPermissions() {
+  const snap = await invoke<PermissionsSnapshot>("get_permissions_status");
+  renderPermissions(snap);
 }
 
 function fillForm(cfg: AppConfig) {
@@ -106,6 +209,45 @@ async function loadSettings() {
 }
 
 window.addEventListener("DOMContentLoaded", () => {
-  loadAccessibilityBanner().catch(console.error);
+  loadPermissions().catch(console.error);
   loadSettings().catch(console.error);
+
+  listen("setup-updated", () => {
+    loadPermissions().catch(console.error);
+  }).catch(console.error);
+
+  window.setInterval(() => {
+    if (document.visibilityState === "visible") {
+      invoke<PermissionsSnapshot>("get_permissions_status")
+        .then((snap) => {
+          if (!snap.voice_ready) {
+            renderPermissions(snap);
+          }
+        })
+        .catch(console.error);
+    }
+  }, 2000);
+
+  byId<HTMLButtonElement>("recheck-permissions").addEventListener("click", async () => {
+    const btn = byId<HTMLButtonElement>("recheck-permissions");
+    btn.disabled = true;
+    btn.textContent = "检查中…";
+    try {
+      const snap = await invoke<PermissionsSnapshot>("recheck_permissions");
+      renderPermissions(snap);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "重新检查权限";
+    }
+  });
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") {
+      invoke<PermissionsSnapshot>("recheck_permissions")
+        .then(renderPermissions)
+        .catch(console.error);
+    }
+  });
 });

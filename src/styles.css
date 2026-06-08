@@ -31,20 +31,99 @@ body {
   color: #666;
 }
 
-.banner {
+.permissions-section {
+  margin-bottom: 8px;
+}
+
+.voice-ready-status {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 0.9rem;
   background: #fff3cd;
-  border: 1px solid #ffe08a;
-  border-radius: 10px;
-  padding: 12px 14px;
-  margin-bottom: 20px;
+  color: #856404;
 }
 
-.banner.hidden {
-  display: none;
+.voice-ready-status.is-ready {
+  background: #d4edda;
+  color: #155724;
 }
 
-.banner p {
-  margin: 0 0 10px;
+.voice-ready-status.is-blocked {
+  background: #fff3cd;
+  color: #856404;
+}
+
+.voice-ready-status.is-error {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+.permissions-list {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.permission-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px 12px;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #fff;
+  border: 1px solid #e5e5ea;
+}
+
+.permission-name {
+  font-weight: 600;
+}
+
+.permission-desc {
+  grid-column: 1;
+  font-size: 0.85rem;
+  color: #666;
+  font-weight: 400;
+}
+
+.permission-status {
+  grid-row: 1 / span 2;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+.permission-row.is-granted .permission-status {
+  color: #2e7d32;
+}
+
+.permission-row:not(.is-granted) .permission-status {
+  color: #b45309;
+}
+
+.permission-action {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  padding: 5px 10px;
+  font-size: 0.85rem;
+}
+
+.secondary-btn {
+  background: #fff;
+  color: #1a1a1a;
+  border-color: #c8c8cc;
+}
+
+.secondary-btn:hover {
+  background: #f5f5f7;
+}
+
+.secondary-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .settings-form {
@@ -134,13 +213,34 @@ button:hover {
   .subtitle,
   .save-status,
   .settings-section h2,
-  .field-note {
+  .field-note,
+  .permission-desc {
     color: #a1a1a6;
   }
 
-  .banner {
-    background: #3a3419;
-    border-color: #665c1e;
+  .voice-ready-status.is-ready {
+    background: #1e3a28;
+    color: #8fd4a0;
+  }
+
+  .voice-ready-status.is-blocked {
+    background: #3a3420;
+    color: #e6c76a;
+  }
+
+  .permission-row {
+    background: #2c2c2e;
+    border-color: #48484a;
+  }
+
+  .secondary-btn {
+    background: #3a3a3c;
+    color: #f5f5f7;
+    border-color: #48484a;
+  }
+
+  .secondary-btn:hover {
+    background: #48484a;
   }
 
   input,

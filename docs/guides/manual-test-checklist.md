@@ -1,6 +1,8 @@
-# Vosi v0.1 手动测试清单
+# Vosi 手动测试清单
 
-在发布前于 **macOS** 和 **Windows** 各完成一遍。
+**应用版本**：`0.1.1`（与 `Vosi_0.1.1_*.dmg` / NSIS 安装包版本号一致）
+
+在发布前于 **macOS** 和 **Windows** 各完成一遍。当前 ASR 为 **SenseVoice INT8**（多语 `auto`），含可选标点后处理。
 
 ## 安装与启动
 
@@ -17,10 +19,13 @@
 
 ## 按住说话（Hold-to-Talk）
 
-- [ ] 默认热键（macOS 右 Command / Windows 右 Alt）按住开始录音，托盘 tooltip 显示「正在录音…」
+- [ ] 默认热键（macOS 右 Command / Windows 右 Alt）**按住 ≥ 300 ms** 开始录音，托盘 tooltip 显示「正在录音…」
 - [ ] 松开热键后停止录音，tooltip 恢复「就绪」
-- [ ] 短按（< 300 ms）不产生输出
+- [ ] 短按（< 300 ms）不产生输出、不显示浮窗
+- [ ] macOS：左 Command + C 等快捷键**不**唤起 Vosi
 - [ ] 对着麦克风说「你好世界」，松开后文本注入到当前焦点应用
+- [ ] 中英混说一句（如「打开 Chrome 浏览器」），识别含英文词
+- [ ] 首次启动：模型从 bundled 复制到 Application Support 期间，托盘显示准备中（非「就绪」）
 
 ## 文本注入
 
@@ -57,9 +62,11 @@
 ## 托盘图标
 
 - [ ] 就绪 / 录音 / 警告 三态图标可区分
+- [ ] 就绪态为**白色胶囊 + 红点 + 蓝柱**，透明底，与菜单栏其他图标高度协调
+- [ ] App 图标（Dock）与托盘图标视觉一致但比例可不同
 
 ## 打包（Release 构建后）
 
-- [ ] macOS `.dmg` 可安装并运行
-- [ ] Windows `.exe` / NSIS 安装包可安装并运行
-- [ ] 安装包内含 bundled 模型（首次运行无需联网下载）
+- [ ] macOS arm64 / Intel `.dmg` 可安装并运行（CI 或对应架构机器本地构建）
+- [ ] Windows NSIS `.exe` 可安装并运行
+- [ ] 安装包内含 bundled 模型（`tauri.conf.json` 使用 `models/bundled/` 递归打包；构建前运行 `prepare-bundle-models.sh`）

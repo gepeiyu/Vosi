@@ -10,6 +10,8 @@ lerna-debug.log*
 node_modules
 dist
 models/dev/
+src-tauri/models/bundled/*
+!src-tauri/models/bundled/.gitkeep
 .cache/
 dist-ssr
 *.local

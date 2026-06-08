@@ -44,6 +44,7 @@ pub fn method_from_config(name: &str) -> InjectMethod {
 pub struct FallbackResult {
     pub injected: bool,
     pub copied_to_clipboard: bool,
+    pub error: Option<String>,
 }
 
 pub fn inject_with_fallback(
@@ -55,14 +56,16 @@ pub fn inject_with_fallback(
         Ok(()) => FallbackResult {
             injected: true,
             copied_to_clipboard: false,
+            error: None,
         },
-        Err(_) => {
+        Err(err) => {
             let copied_to_clipboard = arboard::Clipboard::new()
                 .and_then(|mut clipboard| clipboard.set_text(text.to_owned()))
                 .is_ok();
             FallbackResult {
                 injected: false,
                 copied_to_clipboard,
+                error: Some(err),
             }
         }
     }
