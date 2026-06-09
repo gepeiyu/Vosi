@@ -293,9 +293,9 @@ fn spawn_voice_pipeline(
     });
 }
 
-fn setup_tray_menu(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
+fn setup_tray(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     let locale = app.state::<AppState>().locale();
-    tray::rebuild_tray_menu(app.handle(), locale)?;
+    tray::setup_tray(app.handle(), locale)?;
     Ok(())
 }
 
@@ -363,7 +363,7 @@ pub fn run() {
         .manage(app_state)
         .setup(move |app| {
             tray::configure_background_app(app.handle());
-            setup_tray_menu(app)?;
+            setup_tray(app)?;
             i18n::apply_locale(app.handle(), app.state::<AppState>().locale());
             let bundled = app
                 .path()
