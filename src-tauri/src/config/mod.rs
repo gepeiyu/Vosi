@@ -13,8 +13,7 @@ pub fn config_path() -> PathBuf {
 }
 
 pub(crate) fn migrate_config(mut cfg: AppConfig) -> AppConfig {
-    // 旧版跨平台默认 RightAlt → 各平台推荐键
-    if cfg.hotkey.trigger_key == "RightAlt" && cfg!(target_os = "macos") {
+    if matches!(cfg.hotkey.trigger_key.as_str(), "RightAlt" | "LeftAlt") {
         cfg.hotkey.trigger_key = types::default_trigger_key();
     }
     cfg

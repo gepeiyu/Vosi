@@ -76,12 +76,12 @@ fn default_use_itn() -> bool {
     true
 }
 
-/// macOS: 空格右侧 Command；Windows: 空格右侧 Alt
+/// macOS: 空格右侧 Command；Windows: 空格右侧 Ctrl
 pub fn default_trigger_key() -> String {
     if cfg!(target_os = "macos") {
         "RightCommand".into()
     } else {
-        "RightAlt".into()
+        "RightCtrl".into()
     }
 }
 

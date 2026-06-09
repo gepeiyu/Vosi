@@ -23,8 +23,6 @@
   "settings.option.inject.paste": "クリップボード貼り付け",
   "settings.option.trigger.right_command_mac": "右 Command ⌘（macOS 推奨）",
   "settings.option.trigger.left_command": "左 Command ⌘",
-  "settings.option.trigger.right_alt_win": "右 Alt（Windows 推奨）",
-  "settings.option.trigger.left_alt": "左 Alt",
   "settings.option.trigger.right_ctrl": "右 Ctrl",
   "settings.option.trigger.left_ctrl": "左 Ctrl",
   "settings.option.locale.zh": "中文",

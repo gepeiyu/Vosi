@@ -50,6 +50,13 @@ impl AudioCapture {
         let best = configs
             .iter()
             .min_by_key(|range| {
+                let format_penalty = match range.sample_format() {
+                    SampleFormat::F32 => 0,
+                    SampleFormat::I16 => 1,
+                    SampleFormat::U16 => 2,
+                    SampleFormat::U8 => 20,
+                    _ => 50,
+                };
                 let mono_penalty = if range.channels() == 1 { 0 } else { 10 };
                 let rate_penalty =
                     if range.min_sample_rate().0 <= target_rate && range.max_sample_rate().0 >= target_rate
@@ -58,7 +65,7 @@ impl AudioCapture {
                     } else {
                         5
                     };
-                (mono_penalty + rate_penalty, range.channels())
+                (format_penalty, mono_penalty + rate_penalty, range.channels())
             })
             .expect("non-empty supported_input_configs");
 
@@ -125,6 +132,21 @@ impl AudioCapture {
                 device.build_input_stream(
                     &config,
                     move |data: &[u16], _| {
+                        let mono =
+                            interleaved_to_mono(data.iter().map(|s| s.to_sample::<f32>()), channels);
+                        append_samples(&buf, mono.iter().copied());
+                        maybe_emit_level(&buf, mono.len(), sample_rate, &level_tx, &level_counter);
+                    },
+                    stream_error,
+                    None,
+                )
+            }
+            SampleFormat::U8 => {
+                let level_tx = level_tx.clone();
+                let level_counter = since_last_level.clone();
+                device.build_input_stream(
+                    &config,
+                    move |data: &[u8], _| {
                         let mono =
                             interleaved_to_mono(data.iter().map(|s| s.to_sample::<f32>()), channels);
                         append_samples(&buf, mono.iter().copied());

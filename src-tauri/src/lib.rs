@@ -118,7 +118,7 @@ fn spawn_voice_pipeline(
     let (hotkey_tx, hotkey_rx) = mpsc::channel::<HotkeyEvent>();
     let (pipeline_tx, pipeline_rx) = mpsc::channel::<PipelineEvent>();
     let hotkey_pipeline_tx = pipeline_tx.clone();
-    listener::spawn_hotkey_listener(&config.hotkey.trigger_key, hotkey_tx);
+    listener::spawn_hotkey_listener(app.state::<AppState>().config_handle(), hotkey_tx);
 
     thread::spawn(move || {
         for event in hotkey_rx {

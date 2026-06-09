@@ -92,6 +92,10 @@ impl AppState {
         self.config.read().expect("config lock").clone()
     }
 
+    pub fn config_handle(&self) -> Arc<RwLock<AppConfig>> {
+        Arc::clone(&self.config)
+    }
+
     pub fn locale(&self) -> Locale {
         Locale::parse(&self.get_config().general.locale)
     }

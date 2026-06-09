@@ -1,4 +1,6 @@
+use crate::config::AppConfig;
 use std::sync::mpsc::Sender;
+use std::sync::{Arc, RwLock};
 
 #[cfg(not(target_os = "macos"))]
 use std::thread;
@@ -11,21 +13,32 @@ pub enum HotkeyEvent {
     Released,
 }
 
-pub fn spawn_hotkey_listener(trigger_name: &str, tx: Sender<HotkeyEvent>) {
+pub fn spawn_hotkey_listener(config: Arc<RwLock<AppConfig>>, tx: Sender<HotkeyEvent>) {
     #[cfg(target_os = "macos")]
-    super::macos::spawn_listener(trigger_name, tx);
+    {
+        let trigger_name = config
+            .read()
+            .expect("config lock")
+            .hotkey
+            .trigger_key
+            .clone();
+        super::macos::spawn_listener(&trigger_name, tx);
+    }
 
     #[cfg(not(target_os = "macos"))]
     {
-        let trigger = key_from_name(trigger_name);
-        spawn_rdev_listener(trigger, tx);
+        spawn_rdev_listener(config, tx);
     }
 }
 
 #[cfg(not(target_os = "macos"))]
-fn spawn_rdev_listener(trigger: Key, tx: Sender<HotkeyEvent>) {
+fn spawn_rdev_listener(config: Arc<RwLock<AppConfig>>, tx: Sender<HotkeyEvent>) {
     thread::spawn(move || {
         let callback = move |event: Event| {
+            let trigger = {
+                let cfg = config.read().expect("config lock");
+                key_from_name(&cfg.hotkey.trigger_key)
+            };
             match event.event_type {
                 EventType::KeyPress(key) if key == trigger => {
                     let _ = tx.send(HotkeyEvent::Pressed);
@@ -53,6 +66,6 @@ pub fn key_from_name(name: &str) -> Key {
         "LeftCtrl" => Key::ControlLeft,
         "RightShift" => Key::ShiftRight,
         "LeftShift" => Key::ShiftLeft,
-        _ => Key::AltGr,
+        _ => Key::ControlRight,
     }
 }

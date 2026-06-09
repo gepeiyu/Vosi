@@ -192,6 +192,7 @@ pub fn show_about_window<R: Runtime>(app: &AppHandle<R>) {
     let _ = window.set_focus();
 }
 
+#[cfg(target_os = "macos")]
 fn restore_accessory_if_no_windows_visible<R: Runtime>(app: &AppHandle<R>) {
     let any_visible = ["main", "about"].iter().any(|label| {
         app.get_webview_window(label)
