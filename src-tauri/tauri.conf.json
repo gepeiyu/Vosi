@@ -23,6 +23,18 @@
         "skipTaskbar": true
       },
       {
+        "label": "about",
+        "title": "关于 Vosi",
+        "url": "about.html",
+        "width": 360,
+        "height": 320,
+        "visible": false,
+        "decorations": true,
+        "skipTaskbar": true,
+        "resizable": false,
+        "center": true
+      },
+      {
         "label": "overlay",
         "title": "Vosi Overlay",
         "url": "overlay.html",

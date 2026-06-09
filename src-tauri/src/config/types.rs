@@ -45,10 +45,16 @@ pub struct InjectConfig {
     pub method: String,
 }
 
+fn default_locale() -> String {
+    "zh".into()
+}
+
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct GeneralConfig {
     pub start_on_boot: bool,
     pub show_tray: bool,
+    #[serde(default = "default_locale")]
+    pub locale: String,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -108,6 +114,7 @@ impl Default for AppConfig {
             general: GeneralConfig {
                 start_on_boot: true,
                 show_tray: true,
+                locale: default_locale(),
             },
             overlay: OverlayConfig { enabled: true },
         }

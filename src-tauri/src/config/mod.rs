@@ -53,6 +53,38 @@ mod tests {
     }
 
     #[test]
+    fn config_without_locale_defaults_to_zh() {
+        let raw = r#"
+[hotkey]
+trigger_key = "RightCommand"
+mode = "hold"
+
+[audio]
+sample_rate = 16000
+silence_threshold_ms = 800
+min_speech_ms = 300
+
+[asr]
+num_threads = 2
+mode = "short"
+model_variant = "sense-voice-int8"
+
+[hotword]
+enabled = true
+file = "~/.config/vosi/hotwords.txt"
+
+[inject]
+method = "type"
+
+[general]
+start_on_boot = true
+show_tray = true
+"#;
+        let cfg: AppConfig = toml::from_str(raw).unwrap();
+        assert_eq!(cfg.general.locale, "zh");
+    }
+
+    #[test]
     fn config_without_overlay_section_gets_default_overlay() {
         let raw = r#"
 [hotkey]

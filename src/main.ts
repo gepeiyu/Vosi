@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { applyLocale, setLocale, t } from "./i18n";
 
 type AppConfig = {
   hotkey: { trigger_key: string; mode: string };
@@ -11,7 +12,7 @@ type AppConfig = {
   asr: { num_threads: number; mode: string; model_variant: string };
   hotword: { enabled: boolean; file: string };
   inject: { method: string };
-  general: { start_on_boot: boolean; show_tray: boolean };
+  general: { start_on_boot: boolean; show_tray: boolean; locale: string };
   overlay: { enabled: boolean };
 };
 
@@ -45,20 +46,20 @@ function byId<T extends HTMLElement>(id: string): T {
 
 function voiceStatusText(snap: PermissionsSnapshot): string {
   if (snap.voice_ready) {
-    return "语音功能：就绪";
+    return t("settings.voice.ready");
   }
   if (!snap.all_granted) {
-    return "语音功能：未就绪（请先开启下方全部权限）";
+    return t("settings.voice.not_ready");
   }
   switch (snap.setup_phase) {
     case "installing_models":
-      return snap.setup_message ?? "语音功能：正在安装语音模型…";
+      return snap.setup_message ?? t("settings.voice.installing");
     case "loading_engine":
-      return snap.setup_message ?? "语音功能：正在加载语音引擎…";
+      return snap.setup_message ?? t("settings.voice.loading");
     case "error":
-      return snap.setup_message ?? "语音功能：安装失败，请重新安装";
+      return snap.setup_message ?? t("settings.voice.error");
     default:
-      return "语音功能：启动中…";
+      return t("settings.voice.starting");
   }
 }
 
@@ -85,7 +86,9 @@ function renderPermissions(snap: PermissionsSnapshot) {
 
       const status = document.createElement("span");
       status.className = "permission-status";
-      status.textContent = item.granted ? "已授权" : "未授权";
+      status.textContent = item.granted
+        ? t("settings.perm.granted")
+        : t("settings.perm.denied");
 
       li.append(name, desc, status);
 
@@ -93,20 +96,20 @@ function renderPermissions(snap: PermissionsSnapshot) {
         const btn = document.createElement("button");
         btn.type = "button";
         btn.className = "secondary-btn permission-action";
-        btn.textContent = item.action_label || "去设置";
+        btn.textContent = item.action_label || t("settings.perm.action.fallback");
         btn.addEventListener("click", async () => {
           btn.disabled = true;
           try {
             await invoke("open_permission_settings", { permissionId: item.id });
             byId<HTMLParagraphElement>("permissions-tip").textContent =
               item.id === "accessibility"
-                ? "已尝试清除旧授权并打开系统设置。若弹出密码框请输入 Mac 登录密码，然后在辅助功能列表中重新添加 Vosi，再点「重新检查权限」。"
-                : "已打开系统设置，请开启权限后返回并点击「重新检查权限」。";
+                ? t("settings.perm.tip.accessibility_opened")
+                : t("settings.perm.tip.settings_opened");
             byId<HTMLParagraphElement>("permissions-tip").classList.remove("hidden");
           } catch (err) {
             console.error(err);
             byId<HTMLParagraphElement>("permissions-tip").textContent =
-              "无法打开系统设置，请手动前往：系统设置 → 隐私与安全性";
+              t("settings.perm.tip.open_failed");
             byId<HTMLParagraphElement>("permissions-tip").classList.remove("hidden");
           } finally {
             btn.disabled = false;
@@ -135,6 +138,7 @@ async function loadPermissions() {
 }
 
 function fillForm(cfg: AppConfig) {
+  byId<HTMLSelectElement>("locale").value = cfg.general.locale;
   byId<HTMLSelectElement>("trigger-key").value = cfg.hotkey.trigger_key;
   byId<HTMLSelectElement>("asr-mode").value = cfg.asr.mode;
   byId<HTMLInputElement>("silence-threshold").value = String(
@@ -179,6 +183,7 @@ function readForm(base: AppConfig): AppConfig {
     },
     general: {
       ...base.general,
+      locale: byId<HTMLSelectElement>("locale").value,
       show_tray: byId<HTMLInputElement>("show-tray").checked,
       start_on_boot: byId<HTMLInputElement>("start-on-boot").checked,
     },
@@ -190,19 +195,24 @@ function readForm(base: AppConfig): AppConfig {
 
 async function loadSettings() {
   const cfg = await invoke<AppConfig>("get_config");
+  setLocale(cfg.general.locale);
+  applyLocale();
   fillForm(cfg);
 
   byId<HTMLFormElement>("settings-form").addEventListener("submit", async (e) => {
     e.preventDefault();
     const status = byId<HTMLSpanElement>("save-status");
-    status.textContent = "保存中…";
+    status.textContent = t("settings.status.saving");
     try {
       const updated = readForm(cfg);
       await invoke("save_config", { cfg: updated });
       Object.assign(cfg, updated);
-      status.textContent = "已保存";
+      setLocale(updated.general.locale);
+      applyLocale();
+      status.textContent = t("settings.status.saved");
+      await loadPermissions();
     } catch (err) {
-      status.textContent = "保存失败";
+      status.textContent = t("settings.status.save_failed");
       console.error(err);
     }
   });
@@ -213,6 +223,12 @@ window.addEventListener("DOMContentLoaded", () => {
   loadSettings().catch(console.error);
 
   listen("setup-updated", () => {
+    loadPermissions().catch(console.error);
+  }).catch(console.error);
+
+  listen("locale-changed", (event) => {
+    setLocale(String(event.payload));
+    applyLocale();
     loadPermissions().catch(console.error);
   }).catch(console.error);
 
@@ -231,7 +247,7 @@ window.addEventListener("DOMContentLoaded", () => {
   byId<HTMLButtonElement>("recheck-permissions").addEventListener("click", async () => {
     const btn = byId<HTMLButtonElement>("recheck-permissions");
     btn.disabled = true;
-    btn.textContent = "检查中…";
+    btn.textContent = t("settings.status.rechecking");
     try {
       const snap = await invoke<PermissionsSnapshot>("recheck_permissions");
       renderPermissions(snap);
@@ -239,7 +255,7 @@ window.addEventListener("DOMContentLoaded", () => {
       console.error(err);
     } finally {
       btn.disabled = false;
-      btn.textContent = "重新检查权限";
+      btn.textContent = t("settings.btn.recheck_permissions");
     }
   });
 
