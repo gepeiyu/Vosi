@@ -60,21 +60,21 @@ pub fn rebuild_tray_menu<R: Runtime>(
     let show = MenuItem::with_id(
         app,
         "show",
-        &i18n::t(locale, "tray.menu.settings"),
+        i18n::t(locale, "tray.menu.settings"),
         true,
         None::<&str>,
     )?;
     let about = MenuItem::with_id(
         app,
         "about",
-        &i18n::t(locale, "tray.menu.about"),
+        i18n::t(locale, "tray.menu.about"),
         true,
         None::<&str>,
     )?;
     let quit = MenuItem::with_id(
         app,
         "quit",
-        &i18n::t(locale, "tray.menu.quit"),
+        i18n::t(locale, "tray.menu.quit"),
         true,
         None::<&str>,
     )?;
@@ -191,7 +191,7 @@ pub fn on_settings_close_requested<R: Runtime>(window: &Window<R>) {
     let _ = window.hide();
     #[cfg(target_os = "macos")]
     {
-        restore_accessory_if_no_windows_visible(&window.app_handle());
+        restore_accessory_if_no_windows_visible(window.app_handle());
     }
 }
 
@@ -200,6 +200,6 @@ pub fn on_about_close_requested<R: Runtime>(window: &Window<R>) {
     let _ = window.hide();
     #[cfg(target_os = "macos")]
     {
-        restore_accessory_if_no_windows_visible(&window.app_handle());
+        restore_accessory_if_no_windows_visible(window.app_handle());
     }
 }

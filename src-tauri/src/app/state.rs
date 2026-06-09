@@ -93,7 +93,7 @@ impl AppState {
     }
 
     pub fn locale(&self) -> Locale {
-        Locale::from_str(&self.get_config().general.locale)
+        Locale::parse(&self.get_config().general.locale)
     }
 
     pub fn set_config(&self, cfg: AppConfig) -> Result<(), String> {
