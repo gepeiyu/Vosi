@@ -8,51 +8,49 @@
     <script type="module" src="/src/main.ts" defer></script>
   </head>
 
-  <body>
+  <body data-window-title="window.main.title">
     <main class="settings">
       <header class="settings-header">
         <h1>Vosi</h1>
-        <p class="subtitle">全离线桌面语音输入</p>
+        <p class="subtitle" data-i18n="settings.subtitle"></p>
       </header>
 
       <section class="settings-section permissions-section" aria-labelledby="permissions-title">
-        <h2 id="permissions-title">系统权限</h2>
-        <p id="voice-ready-status" class="voice-ready-status">检查中…</p>
+        <h2 id="permissions-title" data-i18n="settings.section.permissions"></h2>
+        <p id="voice-ready-status" class="voice-ready-status" data-i18n="settings.status.checking"></p>
         <ul id="permissions-list" class="permissions-list"></ul>
         <p id="permissions-tip" class="field-note hidden"></p>
-        <button type="button" id="recheck-permissions" class="secondary-btn">
-          重新检查权限
-        </button>
+        <button type="button" id="recheck-permissions" class="secondary-btn" data-i18n="settings.btn.recheck_permissions"></button>
       </section>
 
       <form id="settings-form" class="settings-form">
         <section class="settings-section">
-          <h2>语音</h2>
+          <h2 data-i18n="settings.section.voice"></h2>
 
           <label>
-            静音阈值 (ms)
+            <span data-i18n="settings.field.silence_threshold"></span>
             <input id="silence-threshold" name="silence_threshold_ms" type="number" min="200" max="3000" step="100" />
           </label>
 
           <label>
-            最短语音 (ms)
+            <span data-i18n="settings.field.min_speech"></span>
             <input id="min-speech-ms" name="min_speech_ms" type="number" min="100" max="1000" step="50" />
           </label>
         </section>
 
         <section class="settings-section">
-          <h2>识别</h2>
+          <h2 data-i18n="settings.section.recognition"></h2>
 
           <label>
-            ASR 模式
+            <span data-i18n="settings.field.asr_mode"></span>
             <select id="asr-mode" name="asr_mode">
-              <option value="short">短句</option>
-              <option value="long">长句</option>
+              <option value="short" data-i18n="settings.option.asr_mode.short"></option>
+              <option value="long" data-i18n="settings.option.asr_mode.long"></option>
             </select>
           </label>
 
           <label>
-            推理线程数
+            <span data-i18n="settings.field.num_threads"></span>
             <select id="num-threads" name="num_threads">
               <option value="1">1</option>
               <option value="2">2</option>
@@ -63,61 +61,70 @@
 
           <label class="checkbox">
             <input id="hotword-enabled" name="hotword_enabled" type="checkbox" />
-            启用热词替换
+            <span data-i18n="settings.field.hotword_enabled"></span>
           </label>
 
           <label>
-            热词文件路径
+            <span data-i18n="settings.field.hotword_file"></span>
             <input id="hotword-file" name="hotword_file" type="text" />
           </label>
         </section>
 
         <section class="settings-section">
-          <h2>输出</h2>
+          <h2 data-i18n="settings.section.output"></h2>
 
           <label>
-            注入方式
+            <span data-i18n="settings.field.inject_method"></span>
             <select id="inject-method" name="inject_method">
-              <option value="type">模拟键盘输入</option>
-              <option value="paste">剪贴板粘贴</option>
+              <option value="type" data-i18n="settings.option.inject.type"></option>
+              <option value="paste" data-i18n="settings.option.inject.paste"></option>
             </select>
           </label>
         </section>
 
         <section class="settings-section">
-          <h2>通用</h2>
+          <h2 data-i18n="settings.section.general"></h2>
 
           <label>
-            触发键
+            <span data-i18n="settings.field.locale"></span>
+            <select id="locale" name="locale">
+              <option value="zh" data-i18n="settings.option.locale.zh"></option>
+              <option value="en" data-i18n="settings.option.locale.en"></option>
+              <option value="ja" data-i18n="settings.option.locale.ja"></option>
+            </select>
+          </label>
+
+          <label>
+            <span data-i18n="settings.field.trigger_key"></span>
             <select id="trigger-key" name="trigger_key">
-              <option value="RightCommand">右 Command ⌘（macOS 推荐）</option>
-              <option value="LeftCommand">左 Command ⌘</option>
-              <option value="RightAlt">右 Alt（Windows 推荐）</option>
-              <option value="LeftAlt">左 Alt</option>
-              <option value="RightCtrl">右 Ctrl</option>
-              <option value="LeftCtrl">左 Ctrl</option>
+              <option value="RightCommand" data-i18n="settings.option.trigger.right_command_mac"></option>
+              <option value="LeftCommand" data-i18n="settings.option.trigger.left_command"></option>
+              <option value="RightAlt" data-i18n="settings.option.trigger.right_alt_win"></option>
+              <option value="LeftAlt" data-i18n="settings.option.trigger.left_alt"></option>
+              <option value="RightCtrl" data-i18n="settings.option.trigger.right_ctrl"></option>
+              <option value="LeftCtrl" data-i18n="settings.option.trigger.left_ctrl"></option>
             </select>
           </label>
 
           <label class="checkbox">
             <input id="overlay-enabled" name="overlay_enabled" type="checkbox" />
-            显示浮动胶囊
+            <span data-i18n="settings.field.overlay_enabled"></span>
           </label>
 
           <label class="checkbox">
             <input id="show-tray" name="show_tray" type="checkbox" />
-            显示托盘图标
+            <span data-i18n="settings.field.show_tray"></span>
           </label>
 
           <label class="checkbox">
             <input id="start-on-boot" name="start_on_boot" type="checkbox" />
-            开机自启动
+            <span data-i18n="settings.field.start_on_boot"></span>
           </label>
-          <p class="field-note">平台注册即将支持</p>
+          <p class="field-note" data-i18n="settings.note.start_on_boot"></p>
         </section>
 
         <div class="form-actions">
-          <button type="submit" id="save-btn">保存设置</button>
+          <button type="submit" id="save-btn" data-i18n="settings.btn.save"></button>
           <span id="save-status" class="save-status" aria-live="polite"></span>
         </div>
       </form>

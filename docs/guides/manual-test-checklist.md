@@ -70,3 +70,15 @@
 - [ ] macOS arm64 / Intel `.dmg` 可安装并运行（CI 或对应架构机器本地构建）
 - [ ] Windows NSIS `.exe` 可安装并运行
 - [ ] 安装包内含 bundled 模型（`tauri.conf.json` 使用 `models/bundled/` 递归打包；构建前运行 `prepare-bundle-models.sh`）
+
+## 多语言（zh / en / ja）
+
+- [ ] 首次安装 / 无 locale 字段的旧配置 → 界面中文
+- [ ] 设置 → 语言 → English → 保存 → 设置页全英文
+- [ ] 托盘菜单、tooltip 同步英文
+- [ ] 关于页英文
+- [ ] 按住热键 → 胶囊显示「Processing」
+- [ ] 权限区块 label / 按钮英文
+- [ ] 切换日文重复上述检查
+- [ ] 重启应用 → 语言保持
+- [ ] 语言下拉始终显示 `中文` / `English` / `日本語`（不随当前 UI 语言变化）

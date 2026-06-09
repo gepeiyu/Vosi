@@ -1,6 +1,27 @@
 use crate::app::state::AppState;
 use crate::config::AppConfig;
+use crate::i18n;
 use crate::permissions::PermissionsSnapshot;
+use serde::Serialize;
+
+#[derive(Debug, Clone, Serialize)]
+pub struct AppInfo {
+    pub name: String,
+    pub version: String,
+    pub description: String,
+    pub github_url: String,
+}
+
+#[tauri::command]
+pub fn get_app_info(state: tauri::State<'_, AppState>) -> AppInfo {
+    let locale = state.locale();
+    AppInfo {
+        name: "Vosi".into(),
+        version: env!("CARGO_PKG_VERSION").into(),
+        description: i18n::t(locale, "about.description"),
+        github_url: "https://github.com/gepeiyu/Vosi".into(),
+    }
+}
 
 #[tauri::command]
 pub fn get_config(state: tauri::State<'_, AppState>) -> AppConfig {
@@ -8,8 +29,14 @@ pub fn get_config(state: tauri::State<'_, AppState>) -> AppConfig {
 }
 
 #[tauri::command]
-pub fn save_config(state: tauri::State<'_, AppState>, cfg: AppConfig) -> Result<(), String> {
-    state.set_config(cfg)
+pub fn save_config(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, AppState>,
+    cfg: AppConfig,
+) -> Result<(), String> {
+    state.set_config(cfg)?;
+    i18n::apply_locale(&app, state.locale());
+    Ok(())
 }
 
 #[tauri::command]

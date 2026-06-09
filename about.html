@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="stylesheet" href="/src/styles.css" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>关于 Vosi</title>
+    <script type="module" src="/src/about.ts" defer></script>
+  </head>
+
+  <body data-window-title="window.about.title">
+    <main class="about">
+      <header class="about-header">
+        <h1 id="app-name">Vosi</h1>
+        <p id="app-version" class="about-version"></p>
+      </header>
+
+      <p id="app-description" class="about-description"></p>
+
+      <dl class="about-meta">
+        <div class="about-meta-row">
+          <dt data-i18n="about.github_label"></dt>
+          <dd>
+            <a id="github-link" href="#" class="about-link"></a>
+          </dd>
+        </div>
+      </dl>
+    </main>
+  </body>
+</html>

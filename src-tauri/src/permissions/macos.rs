@@ -6,6 +6,7 @@ use super::microphone_macos::{
 use super::status::{PermissionsSnapshot, SetupPhase};
 use crate::app::state::AppState;
 use crate::app::tray::{self, TrayStatus};
+use crate::i18n;
 use crate::log::Logger;
 use std::sync::Arc;
 use tauri::AppHandle;
@@ -15,31 +16,32 @@ pub fn all_granted() -> bool {
 }
 
 pub fn snapshot(state: &AppState) -> PermissionsSnapshot {
+    let locale = state.locale();
     let voice_ready = state.voice_ready();
     let mic_status = microphone_status();
     let permissions = vec![
         super::status::PermissionState {
             id: "microphone".into(),
-            label: "麦克风".into(),
-            description: "录制语音".into(),
+            label: i18n::t(locale, "perm.microphone.label"),
+            description: i18n::t(locale, "perm.microphone.description"),
             granted: is_microphone_authorized(),
             action_label: if is_microphone_authorized() {
                 String::new()
             } else if mic_status == MicrophoneStatus::NotDetermined {
-                "请求授权".into()
+                i18n::t(locale, "perm.action.request")
             } else {
-                "去设置".into()
+                i18n::t(locale, "perm.action.open_settings")
             },
         },
         super::status::PermissionState {
             id: "accessibility".into(),
-            label: "辅助功能".into(),
-            description: "监听热键与输入文字".into(),
+            label: i18n::t(locale, "perm.accessibility.label"),
+            description: i18n::t(locale, "perm.accessibility.description"),
             granted: is_accessibility_trusted(),
             action_label: if is_accessibility_trusted() {
                 String::new()
             } else {
-                "修复权限".into()
+                i18n::t(locale, "perm.action.repair")
             },
         },
     ];
@@ -61,9 +63,7 @@ pub fn snapshot(state: &AppState) -> PermissionsSnapshot {
         reinstall_tip: if all_granted {
             None
         } else if !is_accessibility_trusted() {
-            Some(
-                "辅助功能失效时，点击「修复权限」会自动清除旧授权（需输入 Mac 登录密码），然后打开系统设置重新添加 Vosi。".into(),
-            )
+            Some(i18n::t(locale, "perm.reinstall_tip.accessibility"))
         } else {
             None
         },

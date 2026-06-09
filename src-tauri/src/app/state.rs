@@ -1,4 +1,5 @@
 use crate::config::AppConfig;
+use crate::i18n::locale::Locale;
 use crate::log::Logger;
 use crate::permissions::SetupPhase;
 use std::path::PathBuf;
@@ -89,6 +90,10 @@ impl AppState {
 
     pub fn get_config(&self) -> AppConfig {
         self.config.read().expect("config lock").clone()
+    }
+
+    pub fn locale(&self) -> Locale {
+        Locale::from_str(&self.get_config().general.locale)
     }
 
     pub fn set_config(&self, cfg: AppConfig) -> Result<(), String> {

@@ -1,4 +1,6 @@
+import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { applyLocale, setLocale } from "./i18n";
 
 type OverlayPayload =
   | { phase: "hidden" }
@@ -19,6 +21,18 @@ for (let i = 0; i < BAR_COUNT; i++) {
   bar.className = "bar";
   bars.appendChild(bar);
 }
+
+invoke<{ general: { locale: string } }>("get_config")
+  .then((cfg) => {
+    setLocale(cfg.general.locale);
+    applyLocale();
+  })
+  .catch(console.error);
+
+listen("locale-changed", (event) => {
+  setLocale(String(event.payload));
+  applyLocale();
+}).catch(console.error);
 
 /** Boost quiet mic RMS so bars move visibly during normal speech. */
 function visualLevel(level: number): number {
