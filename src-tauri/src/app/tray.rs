@@ -2,6 +2,7 @@ use crate::i18n::{self, locale::Locale};
 use std::sync::atomic::{AtomicU8, Ordering};
 use tauri::image::Image;
 use tauri::menu::{Menu, MenuItem};
+use tauri::tray::TrayIconBuilder;
 use tauri::{include_image, AppHandle, Manager, Runtime, WebviewWindow, Window};
 
 #[cfg(target_os = "macos")]
@@ -53,10 +54,7 @@ fn icon_for(status: TrayStatus) -> Image<'static> {
     }
 }
 
-pub fn rebuild_tray_menu<R: Runtime>(
-    app: &AppHandle<R>,
-    locale: Locale,
-) -> Result<(), tauri::Error> {
+fn build_tray_menu<R: Runtime>(app: &AppHandle<R>, locale: Locale) -> Result<Menu<R>, tauri::Error> {
     let show = MenuItem::with_id(
         app,
         "show",
@@ -78,7 +76,26 @@ pub fn rebuild_tray_menu<R: Runtime>(
         true,
         None::<&str>,
     )?;
-    let menu = Menu::with_items(app, &[&show, &about, &quit])?;
+    Menu::with_items(app, &[&show, &about, &quit])
+}
+
+pub fn setup_tray<R: Runtime>(app: &AppHandle<R>, locale: Locale) -> Result<(), tauri::Error> {
+    let status = TrayStatus::from_u8(TRAY_STATUS.load(Ordering::Relaxed));
+    let menu = build_tray_menu(app, locale)?;
+    TrayIconBuilder::with_id("main")
+        .icon(icon_for(status))
+        .icon_as_template(false)
+        .tooltip(tooltip_for(status, locale))
+        .menu(&menu)
+        .build(app)?;
+    Ok(())
+}
+
+pub fn rebuild_tray_menu<R: Runtime>(
+    app: &AppHandle<R>,
+    locale: Locale,
+) -> Result<(), tauri::Error> {
+    let menu = build_tray_menu(app, locale)?;
     if let Some(tray) = app.tray_by_id("main") {
         tray.set_menu(Some(menu))?;
         let status = TrayStatus::from_u8(TRAY_STATUS.load(Ordering::Relaxed));
