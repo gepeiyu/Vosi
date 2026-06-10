@@ -145,6 +145,21 @@ download_sense_voice() {
   return 1
 }
 
+download_punctuation() {
+  local dest="$DEST_ROOT/punctuation"
+  mkdir -p "$dest"
+
+  if use_foreign_first || [[ "$MIRROR" == "hf-mirror" ]] || [[ "$MIRROR" == "auto" ]]; then
+    if try_mirror hf \
+      download_hf_file "csukuangfj/sherpa-onnx-punct-ct-transformer-zh-en-vocab272727-2024-04-12" "model.onnx" "$dest/model.onnx"; then
+      return 0
+    fi
+    [[ "$MIRROR" == "hf-mirror" ]] && return 1
+  fi
+
+  return 1
+}
+
 download_vad() {
   local dest="$DEST_ROOT/vad"
   mkdir -p "$dest"
@@ -175,6 +190,7 @@ mkdir -p "$DEST_ROOT"
 log "mirror=$MIRROR dest=$DEST_ROOT"
 
 download_sense_voice
+download_punctuation
 download_vad
 
 log "Done → $DEST_ROOT"

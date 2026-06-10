@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 pub struct ModelPaths {
     pub sense_voice_dir: PathBuf,
     pub vad_model: PathBuf,
+    pub punctuation_model: PathBuf,
 }
 
 pub struct ModelManager {
@@ -25,6 +26,7 @@ impl ModelManager {
         ModelPaths {
             sense_voice_dir: base.join("sense-voice"),
             vad_model: base.join("vad/model.onnx"),
+            punctuation_model: base.join("punctuation/model.onnx"),
         }
     }
 
@@ -43,6 +45,10 @@ impl ModelManager {
             .iter()
             .any(|name| dir.join(name).exists());
         has_model && dir.join("tokens.txt").exists()
+    }
+
+    pub fn punctuation_ready(base: &Path) -> bool {
+        base.join("punctuation/model.onnx").exists()
     }
 
     /// True when Application Support is missing sense-voice but the bundle can supply it.
@@ -73,6 +79,16 @@ impl ModelManager {
             copy_dir_all(&bundled.join("vad"), &dest.join("vad"))?;
         }
 
+        if !Self::punctuation_ready(&dest) {
+            if Self::punctuation_ready(bundled) {
+                copy_dir_all(&bundled.join("punctuation"), &dest.join("punctuation"))?;
+            } else if let Some(dev) = dev_fallback {
+                if Self::punctuation_ready(dev) {
+                    copy_dir_all(&dev.join("punctuation"), &dest.join("punctuation"))?;
+                }
+            }
+        }
+
         if !Self::sense_voice_ready(&dest) {
             copy_dir_all(bundled, &dest)?;
             if !Self::sense_voice_ready(&dest) {
@@ -88,7 +104,7 @@ impl ModelManager {
 }
 
 fn remove_legacy_models(dest: &Path) -> std::io::Result<()> {
-    for name in ["paraformer-zh", "punctuation"] {
+    for name in ["paraformer-zh"] {
         let path = dest.join(name);
         if path.exists() {
             std::fs::remove_dir_all(&path)?;
@@ -139,12 +155,15 @@ mod tests {
     }
 
     #[test]
-    fn ensure_installed_copies_sense_voice_and_removes_legacy_paraformer() {
+    fn ensure_installed_copies_sense_voice_punctuation_and_removes_legacy_paraformer() {
         let bundled = tempfile::tempdir().unwrap();
         let sv = bundled.path().join("sense-voice");
         std::fs::create_dir_all(&sv).unwrap();
         std::fs::write(sv.join("model.int8.onnx"), b"x").unwrap();
         std::fs::write(sv.join("tokens.txt"), b"t").unwrap();
+        let punctuation = bundled.path().join("punctuation");
+        std::fs::create_dir_all(&punctuation).unwrap();
+        std::fs::write(punctuation.join("model.onnx"), b"p").unwrap();
 
         let dest_root = tempfile::tempdir().unwrap();
         let pf = dest_root.path().join("models/paraformer-zh");
@@ -152,10 +171,12 @@ mod tests {
         std::fs::write(pf.join("model.int8.onnx"), b"old").unwrap();
 
         let mgr = ModelManager::new(dest_root.path().to_path_buf());
-        mgr.ensure_installed(bundled.path(), None).unwrap();
+        let paths = mgr.ensure_installed(bundled.path(), None).unwrap();
 
         let models = dest_root.path().join("models");
         assert!(ModelManager::sense_voice_ready(&models));
+        assert!(ModelManager::punctuation_ready(&models));
+        assert!(paths.punctuation_model.ends_with("punctuation/model.onnx"));
         assert!(!models.join("paraformer-zh").exists());
     }
 }

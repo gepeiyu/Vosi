@@ -10,6 +10,7 @@
   "settings.field.asr_mode": "ASR 模式",
   "settings.field.num_threads": "推理线程数",
   "settings.field.hotword_enabled": "启用热词替换",
+  "settings.field.punctuation_enabled": "自动补全标点",
   "settings.field.hotword_file": "热词文件路径",
   "settings.field.inject_method": "注入方式",
   "settings.field.locale": "语言",

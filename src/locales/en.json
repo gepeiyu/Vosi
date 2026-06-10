@@ -10,6 +10,7 @@
   "settings.field.asr_mode": "ASR mode",
   "settings.field.num_threads": "Inference threads",
   "settings.field.hotword_enabled": "Enable hotword replacement",
+  "settings.field.punctuation_enabled": "Add punctuation automatically",
   "settings.field.hotword_file": "Hotword file path",
   "settings.field.inject_method": "Injection method",
   "settings.field.locale": "Language",

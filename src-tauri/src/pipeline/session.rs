@@ -8,6 +8,7 @@ use crate::config::AppConfig;
 use crate::log::Logger;
 use crate::post::hotword::{merge_builtin_hotwords, HotwordReplacer};
 use crate::post::pipeline::post_process;
+use crate::post::punctuation::PunctuationEngine;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc;
 use std::sync::Arc;
@@ -25,6 +26,7 @@ pub enum SessionState {
 pub struct VoiceSession {
     asr: AsrEngine,
     hotwords: HotwordReplacer,
+    punctuation: Option<PunctuationEngine>,
     config: AppConfig,
     logger: Arc<Logger>,
     vad: Option<VadEngine>,
@@ -78,11 +80,27 @@ impl VoiceSession {
             None
         };
 
+        let punctuation = if config.post.punctuation_enabled && paths.punctuation_model.exists() {
+            match PunctuationEngine::new(&paths.punctuation_model, config.asr.num_threads as i32) {
+                Ok(engine) => {
+                    logger.info("punctuation engine initialized");
+                    Some(engine)
+                }
+                Err(err) => {
+                    logger.info(&format!("punctuation unavailable: {err}"));
+                    None
+                }
+            }
+        } else {
+            None
+        };
+
         logger.info("voice session initialized");
 
         Ok(Self {
             asr,
             hotwords,
+            punctuation,
             config,
             logger,
             vad,
@@ -159,6 +177,7 @@ impl VoiceSession {
         let result = finalize_recording(
             &self.asr,
             &self.hotwords,
+            self.punctuation.as_ref(),
             &self.config,
             self.vad.as_ref(),
             samples,
@@ -182,6 +201,7 @@ pub fn join_segments(parts: &[String]) -> String {
 fn finalize_recording(
     asr: &AsrEngine,
     hotwords: &HotwordReplacer,
+    punctuation: Option<&PunctuationEngine>,
     config: &AppConfig,
     vad_engine: Option<&VadEngine>,
     samples: Vec<f32>,
@@ -232,7 +252,18 @@ fn finalize_recording(
                         return None;
                     }
                     logger.info(&format!("asr raw: {}", truncate_log(&raw, 120)));
-                    Some(post_process(&raw, hotwords, hotword_enabled))
+                    let text = post_process(&raw, hotwords, hotword_enabled);
+                    if let Some(punctuation) = punctuation {
+                        match punctuation.punctuate(&text) {
+                            Ok(punctuated) => Some(punctuated),
+                            Err(err) => {
+                                logger.info(&format!("punctuation failed: {err}"));
+                                Some(text)
+                            }
+                        }
+                    } else {
+                        Some(text)
+                    }
                 })
                 .collect();
             let _ = tx.send(texts);

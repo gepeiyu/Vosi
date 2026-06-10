@@ -19,6 +19,13 @@
       "sha256": ""
     },
     {
+      "id": "punctuation-ct-transformer",
+      "dest": "models/dev/punctuation",
+      "hf_mirror": "csukuangfj/sherpa-onnx-punct-ct-transformer-zh-en-vocab272727-2024-04-12",
+      "files": ["model.onnx"],
+      "sha256": ""
+    },
+    {
       "id": "silero-vad",
       "dest": "models/dev/vad",
       "modelscope": "iic/speech_fsmn_vad_zh-cn-16k-common-onnx",

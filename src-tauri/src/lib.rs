@@ -92,7 +92,9 @@ fn dev_models_dir() -> Option<PathBuf> {
     #[cfg(debug_assertions)]
     {
         let dev = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../models/dev");
-        if crate::asr::ModelManager::sense_voice_ready(&dev) {
+        if crate::asr::ModelManager::sense_voice_ready(&dev)
+            || crate::asr::ModelManager::punctuation_ready(&dev)
+        {
             return Some(dev);
         }
     }

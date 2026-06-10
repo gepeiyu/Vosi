@@ -14,6 +14,7 @@ type AppConfig = {
   inject: { method: string };
   general: { start_on_boot: boolean; show_tray: boolean; locale: string };
   overlay: { enabled: boolean };
+  post: { punctuation_enabled: boolean };
 };
 
 type SetupPhase =
@@ -147,6 +148,7 @@ function fillForm(cfg: AppConfig) {
   byId<HTMLInputElement>("min-speech-ms").value = String(cfg.audio.min_speech_ms);
   byId<HTMLSelectElement>("num-threads").value = String(cfg.asr.num_threads);
   byId<HTMLInputElement>("hotword-enabled").checked = cfg.hotword.enabled;
+  byId<HTMLInputElement>("punctuation-enabled").checked = cfg.post.punctuation_enabled;
   byId<HTMLSelectElement>("inject-method").value = cfg.inject.method;
   byId<HTMLInputElement>("hotword-file").value = cfg.hotword.file;
   byId<HTMLInputElement>("overlay-enabled").checked = cfg.overlay.enabled;
@@ -180,6 +182,10 @@ function readForm(base: AppConfig): AppConfig {
       ...base.hotword,
       enabled: byId<HTMLInputElement>("hotword-enabled").checked,
       file: byId<HTMLInputElement>("hotword-file").value,
+    },
+    post: {
+      ...base.post,
+      punctuation_enabled: byId<HTMLInputElement>("punctuation-enabled").checked,
     },
     general: {
       ...base.general,

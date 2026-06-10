@@ -8,6 +8,8 @@ pub struct AppConfig {
     pub general: GeneralConfig,
     #[serde(default)]
     pub overlay: OverlayConfig,
+    #[serde(default)]
+    pub post: PostConfig,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -60,6 +62,24 @@ pub struct GeneralConfig {
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct OverlayConfig {
     pub enabled: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct PostConfig {
+    #[serde(default = "default_punctuation_enabled")]
+    pub punctuation_enabled: bool,
+}
+
+impl Default for PostConfig {
+    fn default() -> Self {
+        Self {
+            punctuation_enabled: default_punctuation_enabled(),
+        }
+    }
+}
+
+fn default_punctuation_enabled() -> bool {
+    true
 }
 
 impl Default for OverlayConfig {
@@ -117,6 +137,7 @@ impl Default for AppConfig {
                 locale: default_locale(),
             },
             overlay: OverlayConfig { enabled: true },
+            post: PostConfig::default(),
         }
     }
 }

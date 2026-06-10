@@ -10,6 +10,7 @@
   "settings.field.asr_mode": "ASR モード",
   "settings.field.num_threads": "推論スレッド数",
   "settings.field.hotword_enabled": "ホットワード置換を有効化",
+  "settings.field.punctuation_enabled": "句読点を自動補完",
   "settings.field.hotword_file": "ホットワードファイルパス",
   "settings.field.inject_method": "入力方式",
   "settings.field.locale": "言語",

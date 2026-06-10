@@ -10,6 +10,9 @@ fn main() {
 
     #[cfg(target_os = "macos")]
     {
+        if std::env::var_os("MACOSX_DEPLOYMENT_TARGET").is_none() {
+            std::env::set_var("MACOSX_DEPLOYMENT_TARGET", "12.0");
+        }
         println!("cargo:rerun-if-changed=native/microphone_permission.m");
         println!("cargo:rerun-if-changed=native/hotkey_monitor.m");
         cc::Build::new()
